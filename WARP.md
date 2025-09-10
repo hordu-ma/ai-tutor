@@ -23,11 +23,18 @@ src/ai_tutor/
 ├── services/         # 业务逻辑层
 │   ├── ocr/          # OCR服务抽象 (TesseractOCR)
 │   ├── llm/          # AI服务抽象 (QwenService, KimiService)
+│   │   └── prompts/  # 提示词模板系统 (科目化、版本化)
+│   ├── parsing/      # 题目解析服务 (QuestionParser, TextAnalyzer)
+│   ├── knowledge/    # 知识点提取服务 (KnowledgeExtractor)
 │   └── student/      # 学生相关服务 (HomeworkService)
 ├── models/           # 数据模型层 (SQLAlchemy)
 ├── schemas/          # API模型 (Pydantic)
 ├── core/             # 核心配置 (config.py, logger.py)
-└── db/               # 数据库连接
+├── db/               # 数据库连接
+└── tests/            # 测试模块
+    ├── integration/  # 集成测试
+    ├── unit/         # 单元测试
+    └── fixtures/     # 测试数据
 ```
 
 ### 数据模型关系
@@ -69,6 +76,9 @@ make test-cov
 
 # 端到端测试 (测试完整批改流程)
 uv run python scripts/test_full_flow.py
+
+# 题目解析功能测试
+uv run python scripts/test_question_parsing.py
 ```
 
 ### 代码质量
@@ -107,7 +117,24 @@ make test-services
 - **抽象基类**: `LLMService`
 - **实现**: `QwenService`, `KimiService`
 - **工厂函数**: `get_llm_service(provider="qwen")`
-- **接口**: `chat()`, `generate()`
+- **接口**: `chat()`, `generate()`, `safe_json_parse()`
+- **增强功能**: JSON解析容错、多级降级策略
+
+### 提示词系统 (`services/llm/prompts/`)
+- **基类**: `BaseGradingPrompts`, `PromptTemplate`
+- **科目实现**: `MathGradingPrompts`, `PhysicsGradingPrompts`
+- **版本管理**: `PromptVersion` (支持v1.0, v1.1, v2.0)
+- **A/B测试**: `PromptManager` (支持流量分配)
+
+### 题目解析服务 (`services/parsing/`)
+- **题目解析器**: `QuestionParser`
+  - 支持多种编号格式: 1. 一、(1) 等
+  - 题目类型识别: 选择题、填空题、计算题等
+  - 答案区域检测和提取
+- **文本分析器**: `TextAnalyzer`
+  - OCR质量评估、复杂度分析
+  - 科目检测、年级估算
+  - 数学内容识别和结构分析
 
 ### 作业批改服务 (`services/student/homework_service.py`)
 - **核心类**: `HomeworkService`
@@ -181,14 +208,65 @@ sudo apt-get install tesseract-ocr tesseract-ocr-chi-sim
 
 ## 项目状态
 
-### MVP 阶段 (当前)
-- ✅ 项目架构和基础设施
-- ✅ OCR文本提取功能
-- 🔄 AI服务集成 (通义千问/Kimi)
-- 🔄 作业批改基础功能
+### 🎉 第一阶段完成 (2025-09-10)
+在第一阶段开发中，我们显著提升了系统的可靠性和功能性：
 
-### 下一步开发
-- 知识点提取和分类
-- 学生学情数据管理
-- RAG系统实现
-- 前端界面完善
+#### ✅ 已完成的核心改进
+1. **环境准备和依赖验证** - 确保开发环境稳定
+2. **端到端测试验证** - 确认系统MVP功能完整可用
+3. **AI服务集成测试** - 建立了完善的测试框架，包含错误处理和并发测试
+4. **优化提示词工程** - 实现了科目化、版本化的提示词管理系统，支持A/B测试
+5. **增强JSON解析容错机制** - 大幅提升了AI响应解析的稳定性，支持多级降级策略
+6. **完善题目识别和结构化解析** - 实现智能题目解析和文本分析功能
+
+#### 📊 系统升级效果
+- **稳定的AI服务集成** - 支持错误处理、超时重试  
+- **智能提示词系统** - 科目化模板、版本管理、A/B测试支持
+- **强大的容错机制** - 多级JSON解析，降级策略完善
+- **完整的测试框架** - 集成测试、端到端测试、健康检查
+- **智能题目解析** - 支持多种编号格式、类型识别、答案提取
+- **文本深度分析** - OCR质量评估、复杂度分析、科目检测
+
+### 🎯 下一阶段开发计划 (优先级排序)
+
+#### 高优先级 - 即将开发
+1. **知识点提取和分类系统** (步骤7 - 部分完成)
+   - ✅ 创建 `src/ai_tutor/services/knowledge/` 目录
+   - 🔄 实现 `KnowledgeExtractor` 基类
+   - 🔄 为数学、英语、物理创建知识点映射表
+   - 🔄 实现基于题目内容的知识点自动标注
+   - 🔄 添加知识点层级结构（章节-知识点-子知识点）
+
+2. **物理科目批改支持完善** (步骤8)
+   - 在 `src/ai_tutor/schemas/` 添加 `physics_schemas.py`
+   - 创建物理题目类型枚举（力学、电学、光学等）
+   - 实现物理公式识别和验证逻辑
+   - 添加物理单位检查和换算功能
+
+3. **测试和文档完善** (步骤9)
+   - 准备真实作业图片（数学、英语、物理各3张）
+   - 运行完整批改流程测试，记录准确率
+   - 执行 `make test-cov` 确保测试覆盖率达标
+   - 更新 README.md 添加新功能说明
+   - 创建 CHANGELOG.md 记录所有改进
+
+#### 中优先级 - 后续开发
+4. **学生学情数据管理**
+   - 完善Student和HomeworkSession数据模型
+   - 实现学生学习记录的持久化
+   - 添加学情分析和进度跟踪
+
+5. **RAG系统实现**
+   - 集成向量数据库存储知识点
+   - 实现基于历史数据的个性化建议
+   - 构建智能推荐系统
+
+6. **前端界面完善**
+   - 改进static/index.html用户界面
+   - 添加批改结果展示组件
+   - 实现实时批改状态反馈
+
+### 📝 开发备注
+- **当前系统状态**: MVP+ 水平，具备稳定的OCR、多科目批改、智能容错和降级能力
+- **最后中断点**: 步骤7 开始实现知识点提取系统，已创建目录结构
+- **重要改进**: JSON解析容错、题目智能解析、提示词系统化显著提升了系统可靠性
