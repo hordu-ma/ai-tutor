@@ -10,6 +10,7 @@ from ...core.logger import LoggerMixin
 from ..ocr import get_ocr_service
 from ..llm import get_llm_service
 from ..llm.prompts import MathGradingPrompts, PhysicsGradingPrompts, PromptVersion
+from ..parsing import QuestionParser, TextAnalyzer
 
 
 # 科目提示词映射
@@ -32,6 +33,8 @@ class HomeworkService(LoggerMixin):
         self.ocr = get_ocr_service()
         self.llm = get_llm_service(provider)
         self.provider = provider
+        self.question_parser = QuestionParser()
+        self.text_analyzer = TextAnalyzer()
 
     async def grade_homework(
         self,
@@ -41,8 +44,17 @@ class HomeworkService(LoggerMixin):
     ) -> Dict[str, Any]:
         """端到端批改流程：OCR -> LLM评阅 -> 结构化结果"""
         t0 = time.time()
-        # 1) OCR
+        
+        # 1) OCR文本提取
         ocr_text = await self.ocr.extract_text(image)
+        
+        # 1.5) 文本分析和预处理
+        text_analysis = self.text_analyzer.extract_key_features(ocr_text)
+        self.log_event("文本分析完成", **{k: v for k, v in text_analysis.items() if not isinstance(v, (list, dict))})
+        
+        # 1.6) 题目结构化解析
+        parsed_questions = self.question_parser.parse_questions(ocr_text)
+        self.log_event("题目解析完成", parsed_questions_count=len(parsed_questions))
 
         # 2) 获取提示词模板并组织Prompt
         subject_lower = subject.lower()
@@ -77,8 +89,31 @@ class HomeworkService(LoggerMixin):
             "ocr_text": ocr_text,
             "correction": parsed,
             "processing_time": round(elapsed, 2),
+            # 新增的结构化解析信息
+            "text_analysis": {
+                "quality_score": text_analysis.get("ocr_confidence", 0.5),
+                "complexity_score": text_analysis.get("complexity_score", 0.5),
+                "subject_indicators": text_analysis.get("subject_indicators", []),
+                "grade_level_estimate": text_analysis.get("grade_level_estimate", "未知"),
+                "question_patterns": text_analysis.get("question_patterns", []),
+                "mathematical_content": text_analysis.get("mathematical_content", {})
+            },
+            "parsed_questions": [
+                {
+                    "question_number": q.question_number,
+                    "question_text": q.question_text,
+                    "question_type": q.question_type.value,
+                    "student_answer": q.student_answer,
+                    "confidence": q.confidence,
+                    "answer_regions_count": len(q.answer_regions)
+                } for q in parsed_questions
+            ]
         }
-        self.log_event("批改完成", provider=self.provider, processing_time=elapsed)
+        self.log_event("批改完成", 
+                      provider=self.provider, 
+                      processing_time=elapsed,
+                      questions_parsed=len(parsed_questions),
+                      avg_confidence=sum(q.confidence for q in parsed_questions) / max(len(parsed_questions), 1))
         return result
     
     def _create_homework_fallback_parser(self, ocr_text: str) -> callable:
