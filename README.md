@@ -39,20 +39,26 @@ make dev
 ```
 ai-tutor/
 ├── src/ai_tutor/           # 主应用代码
-│   ├── api/                  # API路由层
-│   │   └── v1/               # API v1版本
-│   ├── core/                 # 核心配置
+│   ├── api/v1/               # API路由层 (FastAPI endpoints)
 │   ├── services/             # 业务逻辑层
-│   │   ├── ocr/              # OCR服务
-│   │   ├── llm/              # 大模型服务
-│   │   ├── knowledge/        # 知识点提取服务
-│   │   ├── parsing/          # 题目解析服务
-│   │   └── student/          # 学生服务
-│   ├── models/               # 数据模型层
-│   ├── schemas/              # Pydantic模型
-│   └── db/                   # 数据库连接
-├── tests/                   # 测试代码
+│   │   ├── ocr/              # OCR服务抽象 (TesseractOCR)
+│   │   ├── llm/              # AI服务抽象 (QwenService, KimiService)
+│   │   │   └── prompts/      # 提示词模板系统 (科目化、版本化)
+│   │   ├── parsing/          # 题目解析服务 (QuestionParser, TextAnalyzer)
+│   │   ├── knowledge/        # 知识点提取服务 (KnowledgeExtractor)
+│   │   └── student/          # 学生相关服务 (HomeworkService)
+│   ├── models/               # 数据模型层 (SQLAlchemy)
+│   ├── schemas/              # API模型 (Pydantic)
+│   ├── core/                 # 核心配置 (config.py, logger.py)
+│   ├── db/                   # 数据库连接
+│   └── utils/                # 工具函数
+├── tests/                   # 测试模块
+│   ├── integration/          # 集成测试
+│   ├── unit/                 # 单元测试
+│   ├── e2e/                  # 端到端测试
+│   └── fixtures/             # 测试数据
 ├── static/                  # 静态文件
+├── scripts/                 # 工具脚本
 └── docs/                    # 文档
 ```
 
@@ -220,14 +226,155 @@ curl -X POST "http://localhost:8000/api/v1/homework/grade" \
     - 检查文件大小是否超过10MB
     - 确认文件格式支持（JPEG/PNG/JPG/WEBP）
 
+## 🏗️ 架构设计
+
+### 分层架构
+
+系统采用清晰的分层架构设计，职责分离：
+
+- **API路由层**: FastAPI endpoints，处理HTTP请求和响应
+- **业务逻辑层**: 核心服务抽象，包含OCR、LLM、知识点提取等
+- **数据模型层**: SQLAlchemy模型定义和数据库操作
+- **配置层**: 应用配置、日志配置和环境变量管理
+
+### 核心服务
+
+#### OCR服务 (`services/ocr/base.py`)
+
+- **抽象基类**: `OCRService`
+- **实现**: `TesseractOCR`
+- **工厂函数**: `get_ocr_service()`
+- **特性**: 异步处理、图片预处理、支持中英文
+
+#### LLM服务 (`services/llm/base.py`)
+
+- **抽象基类**: `LLMService`
+- **实现**: `QwenService`, `KimiService`
+- **工厂函数**: `get_llm_service(provider="qwen")`
+- **接口**: `chat()`, `generate()`, `safe_json_parse()`
+- **增强功能**: JSON解析容错、多级降级策略
+
+#### 提示词系统 (`services/llm/prompts/`)
+
+- **基类**: `BaseGradingPrompts`, `PromptTemplate`
+- **科目实现**: `MathGradingPrompts`, `PhysicsGradingPrompts`
+- **版本管理**: `PromptVersion` (支持v1.0, v1.1, v2.0)
+- **A/B测试**: `PromptManager` (支持流量分配)
+
+#### 知识点提取服务 (`services/knowledge/`)
+
+- **抽象基类**: `KnowledgeExtractor`
+- **科目实现**: `MathKnowledgeExtractor`, `PhysicsKnowledgeExtractor`
+- **工厂函数**: `get_knowledge_extractor(subject)`
+- **特性**: 科目化分类、智能识别、容错处理
+
+### 数据模型关系
+
+- `Student` -> `HomeworkSession` (一对多)
+- `HomeworkSession` -> `Question` (一对多)
+- 支持多科目: 数学、英语、物理、化学等
+
+## 🔧 环境配置
+
+### 必需配置 (.env)
+
+```bash
+# AI服务配置
+QWEN_API_KEY=your_qwen_api_key_here
+KIMI_API_KEY=your_kimi_api_key_here
+
+# 数据库配置
+DATABASE_URL=postgresql://user:pass@localhost/ai_tutor
+REDIS_URL=redis://localhost:6379/0
+
+# 应用配置
+SECRET_KEY=your_secret_key_here
+OCR_ENGINE=tesseract  # 或 paddleocr
+DEBUG=True
+LOG_LEVEL=INFO
+
+# 服务配置
+LLM_PROVIDER=qwen  # 或 kimi
+MAX_FILE_SIZE=10485760  # 10MB
+SUPPORTED_FORMATS=jpg,jpeg,png,webp
+```
+
+### OCR 依赖安装
+
+```bash
+# macOS
+brew install tesseract tesseract-lang
+
+# Ubuntu/Debian
+sudo apt-get install tesseract-ocr tesseract-ocr-chi-sim
+
+# 验证安装
+tesseract --version
+tesseract --list-langs
+```
+
+## 🛠️ 开发规范
+
+### 日志使用
+
+```python
+from ai_tutor.core.logger import get_logger
+
+logger = get_logger(__name__)
+
+# 结构化日志
+logger.info("Processing homework", student_id="123", subject="math")
+logger.error("OCR failed", error=str(e), filename="test.jpg")
+```
+
+### 错误处理
+
+- 服务层使用抽象基类和工厂模式
+- API层统一异常处理和响应格式
+- 健康检查端点监控各服务状态
+- 使用显式异常处理 (`try...except SpecificError`)
+
+### 异步模式
+
+- 所有I/O操作使用异步 (`async/await`)
+- OCR和LLM服务支持异步调用
+- FastAPI原生异步支持
+
+### 测试策略
+
+- 单元测试覆盖核心逻辑
+- 集成测试验证服务协作
+- 端到端测试完整流程验证
+- 使用 `pytest-mock` 进行模拟测试
+
 ## 🤝 贡献
 
 欢迎提交Issue和Pull Request！请遵循以下规范：
 
-1. 使用`black`格式化代码
-2. 通过`flake8`检查
-3. 添加相应的测试用例
-4. 更新相关文档
+### 代码规范
+
+- 遵循 **Unix 哲学** (专一、简洁、组合) 和 **Python 之禅**
+- 使用 `black` 格式化代码 (line-length=88)
+- 通过 `flake8` 和 `mypy` 检查
+- 函数单一职责，长度不超过60行，必须包含类型注解
+
+### 测试要求
+
+- 为核心功能编写 `pytest` 单元测试
+- 覆盖正常和边界情况
+- 测试覆盖率保持在合理水平
+
+### 提交规范
+
+- 使用语义化提交信息: `feat/fix/docs/style/refactor/test/chore`
+- 清晰描述变更内容和影响范围
+- 更新相关文档
+
+### 安全注意事项
+
+- 严禁在代码中硬编码任何凭证
+- 注意算法复杂度，避免 O(n²) 及以上复杂度
+- 使用环境变量管理敏感配置
 
 ## 📜 许可证
 
