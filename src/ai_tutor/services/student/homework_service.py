@@ -9,47 +9,19 @@ from io import BytesIO
 from ...core.logger import LoggerMixin
 from ..ocr import get_ocr_service
 from ..llm import get_llm_service
+from ..llm.prompts import MathGradingPrompts, PhysicsGradingPrompts, PromptVersion
 
 
-GRADE_PROMPT_TEMPLATE = """
-你是一个严格且有耐心的中学{subject_cn}老师，请对以下作业进行批改。
-要求：
-1) 对每道题给出：是否正确(is_correct: true/false)、得分(score)、满分(max_score)、正确答案(correct_answer)、错误分析(error_analysis)、必要时给出分步讲解(solution_steps)
-2) 提取涉及的知识点(knowledge_points: ["..."]), 并估计每题难度(1-5)和本题掌握程度(0.0-1.0)
-3) 给出总体得分(overall_score)与总体建议(overall_suggestions)
-4) 严格输出JSON，字段：
-{{
-  "questions": [
-    {{
-      "question_number": 1,
-      "question_text": "...",
-      "student_answer": "...",
-      "is_correct": true,
-      "score": 5,
-      "max_score": 5,
-      "correct_answer": "...",
-      "error_analysis": "...",
-      "solution_steps": ["...", "..."],
-      "knowledge_points": ["..."],
-      "difficulty_level": 3
-    }}
-  ],
-  "overall_score": 87.5,
-  "overall_suggestions": "..."
-}}
-
-科目：{subject_cn}
-作业OCR文本如下：
----
-{ocr_text}
----
-请直接返回JSON，不要包含任何额外解释。
-"""
-
+# 科目提示词映射
+SUBJECT_PROMPTS_MAP = {
+    "math": MathGradingPrompts(),
+    "physics": PhysicsGradingPrompts(),
+}
 
 SUBJECT_CN_MAP = {
     "math": "数学",
     "english": "英语",
+    "physics": "物理",
 }
 
 
@@ -72,9 +44,25 @@ class HomeworkService(LoggerMixin):
         # 1) OCR
         ocr_text = await self.ocr.extract_text(image)
 
-        # 2) 组织Prompt并调用LLM
-        subject_cn = SUBJECT_CN_MAP.get(subject.lower(), subject)
-        prompt = GRADE_PROMPT_TEMPLATE.format(subject_cn=subject_cn, ocr_text=ocr_text)
+        # 2) 获取提示词模板并组织Prompt
+        subject_lower = subject.lower()
+        if subject_lower in SUBJECT_PROMPTS_MAP:
+            # 使用专门的科目提示词
+            prompt_provider = SUBJECT_PROMPTS_MAP[subject_lower]
+            prompt_template = prompt_provider.get_grading_prompt(PromptVersion.V1_0)
+            format_example = prompt_provider.get_format_example() if hasattr(prompt_provider, 'get_format_example') else ""
+            prompt = prompt_template.format(ocr_text=ocr_text, format_example=format_example)
+        else:
+            # 回退到通用提示词
+            subject_cn = SUBJECT_CN_MAP.get(subject_lower, subject)
+            prompt = f"""你是一个严格且有耐心的中学{subject_cn}老师，请对以下作业进行批改。
+要求：严格输出JSON格式的批改结果。
+作业OCR文本如下：
+---
+{ocr_text}
+---
+请直接返回JSON。"""
+        
         llm_response = await self.llm.generate(prompt, max_tokens=1800, temperature=0.2)
 
         # 3) 尝试解析为JSON
