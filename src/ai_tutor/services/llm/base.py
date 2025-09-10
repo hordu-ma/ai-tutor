@@ -83,7 +83,7 @@ class QwenService(LLMService):
             self.log_error("Qwen API HTTP错误", status_code=e.response.status_code, response=e.response.text)
             raise Exception(f"Qwen API调用失败: {e.response.status_code}")
         except Exception as e:
-            self.log_error("Qwen API调用异常", error=str(e))
+            self.log_error("Qwen API调用异常", exception_msg=str(e))
             raise Exception(f"Qwen API调用异常: {str(e)}")
     
     async def generate(self, prompt: str, **kwargs) -> str:
@@ -157,7 +157,7 @@ class KimiService(LLMService):
             self.log_error("Kimi API HTTP错误", status_code=e.response.status_code, response=e.response.text)
             raise Exception(f"Kimi API调用失败: {e.response.status_code}")
         except Exception as e:
-            self.log_error("Kimi API调用异常", error=str(e))
+            self.log_error("Kimi API调用异常", exception_msg=str(e))
             raise Exception(f"Kimi API调用异常: {str(e)}")
     
     async def generate(self, prompt: str, **kwargs) -> str:
