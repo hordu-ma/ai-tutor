@@ -65,49 +65,11 @@ class HomeworkService(LoggerMixin):
         
         llm_response = await self.llm.generate(prompt, max_tokens=1800, temperature=0.2)
 
-        # 3) 尝试解析为JSON
-        import json
-        import re
-
-        parsed: Dict[str, Any]
-        try:
-            parsed = json.loads(llm_response)
-        except Exception as e:
-            # 容错：若返回非严格JSON，尽力清洗
-            self.log_warning("大模型返回非严格JSON，尝试清洗", original_error=str(e))
-            
-            # 多种清洗策略
-            cleaned = llm_response.strip()
-            
-            # 移除代码块标记
-            if cleaned.startswith('```json'):
-                cleaned = cleaned[7:]
-            if cleaned.startswith('```'):
-                cleaned = cleaned[3:]
-            if cleaned.endswith('```'):
-                cleaned = cleaned[:-3]
-            
-            # 移除前后空格和特殊字符
-            cleaned = cleaned.strip().strip('` "\'')
-            
-            # 尝试提取JSON部分
-            json_match = re.search(r'\{.*\}', cleaned, re.DOTALL)
-            if json_match:
-                cleaned = json_match.group(0)
-            
-            try:
-                parsed = json.loads(cleaned)
-            except Exception as e2:
-                # 最后的容错机制：返回默认结构
-                self.log_error("无法解析AI返回的JSON", 
-                             original_response=llm_response[:200], 
-                             cleaned_response=cleaned[:200], 
-                             error=str(e2))
-                parsed = {
-                    "questions": [],
-                    "overall_score": 0,
-                    "overall_suggestions": "解析AI回答失败，请检查图片清晰度或重新提交。"
-                }
+        # 3) 使用增强的JSON解析方法
+        parsed: Dict[str, Any] = self.llm.safe_json_parse(
+            llm_response, 
+            fallback_parser=self._create_homework_fallback_parser(ocr_text)
+        )
 
         elapsed = time.time() - t0
         result = {
@@ -118,4 +80,84 @@ class HomeworkService(LoggerMixin):
         }
         self.log_event("批改完成", provider=self.provider, processing_time=elapsed)
         return result
+    
+    def _create_homework_fallback_parser(self, ocr_text: str) -> callable:
+        """创建作业批改的降级解析器"""
+        def homework_fallback_parser(text: str) -> Dict[str, Any]:
+            """作业批改的特定降级解析器"""
+            import re
+            
+            result = {
+                "questions": [],
+                "overall_score": 0,
+                "total_score": 0,
+                "accuracy_rate": 0.0,
+                "overall_suggestions": "解析AI回答失败，但尝试提取了部分信息。",
+                "weak_knowledge_points": [],
+                "study_recommendations": [],
+                "parsing_fallback": True
+            }
+            
+            # 尝试提取分数信息
+            score_patterns = [
+                r'(?:总分|得分|总体得分|overall_score)[:\s]*([0-9.]+)',
+                r'score[:\s]*([0-9.]+)',
+                r'(分数)[:\s]*([0-9.]+)',
+            ]
+            
+            for pattern in score_patterns:
+                match = re.search(pattern, text, re.IGNORECASE)
+                if match:
+                    try:
+                        score = float(match.group(1) if len(match.groups()) == 1 else match.group(2))
+                        result["overall_score"] = score
+                        break
+                    except ValueError:
+                        continue
+            
+            # 尝试提取题目信息
+            question_patterns = [
+                r'(题目|question)\s*([0-9]+)',
+                r'([0-9]+)\s*[\.\)]\s*(.{1,100})',
+            ]
+            
+            questions_found = []
+            for pattern in question_patterns:
+                matches = re.finditer(pattern, text, re.IGNORECASE)
+                for match in matches:
+                    if len(questions_found) < 10:  # 限制数量
+                        question_data = {
+                            "question_number": len(questions_found) + 1,
+                            "question_text": match.group(0)[:100],  # 截取前100字符
+                            "student_answer": "未能识别",
+                            "is_correct": None,
+                            "score": 0,
+                            "max_score": 10,
+                            "correct_answer": "未能解析",
+                            "error_analysis": "解析失败",
+                            "solution_steps": [],
+                            "knowledge_points": [],
+                            "difficulty_level": 3
+                        }
+                        questions_found.append(question_data)
+            
+            result["questions"] = questions_found
+            
+            # 尝试提取建议
+            suggestion_patterns = [
+                r'(?:建议|总结|suggestion|summary)[:\s]*(.{20,300})',
+                r'(?:需要改进|学习建议)[:\s]*(.{20,200})',
+            ]
+            
+            for pattern in suggestion_patterns:
+                match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+                if match:
+                    suggestion = match.group(1).strip()
+                    if len(suggestion) > 15:  # 确保有意义
+                        result["overall_suggestions"] = suggestion[:300]  # 限制长度
+                        break
+            
+            return result
+        
+        return homework_fallback_parser
 

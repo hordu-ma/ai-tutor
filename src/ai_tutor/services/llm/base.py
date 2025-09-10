@@ -2,8 +2,9 @@
 AI大模型服务基础模块
 """
 import json
+import re
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 import httpx
 
 from ...core.logger import LoggerMixin
@@ -22,6 +23,157 @@ class LLMService(ABC, LoggerMixin):
     async def generate(self, prompt: str, **kwargs) -> str:
         """根据提示词生成文本"""
         pass
+    
+    def safe_json_parse(self, text: str, fallback_parser: Optional[callable] = None) -> Dict[str, Any]:
+        """安全的JSON解析，支持容错和降级策略"""
+        if not text or not text.strip():
+            self.log_warning("收到空文本，返回默认结构")
+            return self._get_fallback_structure()
+        
+        original_text = text
+        cleaned_text = text.strip()
+        
+        # 第一次尝试：直接解析
+        try:
+            return json.loads(cleaned_text)
+        except json.JSONDecodeError as e:
+            self.log_warning("JSON直接解析失败", error=str(e), text_preview=cleaned_text[:200])
+        
+        # 第二次尝试：清洗常见格式问题
+        try:
+            cleaned_text = self._clean_json_text(cleaned_text)
+            return json.loads(cleaned_text)
+        except json.JSONDecodeError as e:
+            self.log_warning("JSON清洗后解析失败", error=str(e))
+        
+        # 第三次尝试：提取JSON部分
+        try:
+            extracted_json = self._extract_json_from_text(cleaned_text)
+            if extracted_json:
+                return json.loads(extracted_json)
+        except json.JSONDecodeError as e:
+            self.log_warning("JSON提取后解析失败", error=str(e))
+        
+        # 第四次尝试：修复常见JSON错误
+        try:
+            fixed_json = self._fix_common_json_errors(cleaned_text)
+            return json.loads(fixed_json)
+        except json.JSONDecodeError as e:
+            self.log_warning("JSON修复后解析失败", error=str(e))
+        
+        # 最后的降级策略
+        if fallback_parser:
+            try:
+                result = fallback_parser(original_text)
+                if isinstance(result, dict):
+                    self.log_event("使用降级解析器成功")
+                    return result
+            except Exception as e:
+                self.log_error("降级解析器失败", exception_msg=str(e))
+        
+        # 所有方法都失败，使用文本提取的最后手段
+        self.log_error("所有JSON解析方法失败，使用紧急降级策略", original_text=original_text[:500])
+        return self._emergency_text_extraction(original_text)
+    
+    def _clean_json_text(self, text: str) -> str:
+        """清理JSON文本的常见格式问题"""
+        # 移除代码块标记
+        text = re.sub(r'^```(?:json)?\s*', '', text, flags=re.MULTILINE)
+        text = re.sub(r'```\s*$', '', text, flags=re.MULTILINE)
+        
+        # 移除前后的引号和空格
+        text = text.strip().strip('`"\'')
+        
+        # 处理尾随逗号
+        text = re.sub(r',\s*([}\]])', r'\1', text)
+        
+        # 修复双引号问题
+        text = re.sub(r'(["\'])([^"\']*)(["\'])', r'"\2"', text)
+        
+        return text
+    
+    def _extract_json_from_text(self, text: str) -> Optional[str]:
+        """从文本中提取JSON部分"""
+        # 尝试匹配最外层的JSON对象
+        json_pattern = r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
+        matches = re.findall(json_pattern, text, re.DOTALL)
+        
+        if matches:
+            # 选择最长的匹配（可能是最完整的）
+            return max(matches, key=len)
+        
+        # 尝试匹配JSON数组
+        array_pattern = r'\[[^\[\]]*(?:\[[^\[\]]*\][^\[\]]*)*\]'
+        matches = re.findall(array_pattern, text, re.DOTALL)
+        
+        if matches:
+            return max(matches, key=len)
+        
+        return None
+    
+    def _fix_common_json_errors(self, text: str) -> str:
+        """修复常见的JSON错误"""
+        # 修复缺失的引号
+        text = re.sub(r'(\w+):', r'"\1":', text)  # 为key添加引号
+        
+        # 修复Python的True/False/None
+        text = re.sub(r'\bTrue\b', 'true', text)
+        text = re.sub(r'\bFalse\b', 'false', text)
+        text = re.sub(r'\bNone\b', 'null', text)
+        
+        # 修复单引号为双引号
+        text = re.sub(r"\'([^\']*)\'",'"\1"', text)
+        
+        # 移除多余的逗号
+        text = re.sub(r',\s*([}\]])', r'\1', text)
+        
+        return text
+    
+    def _emergency_text_extraction(self, text: str) -> Dict[str, Any]:
+        """紧急情况下的文本提取降级策略"""
+        result = {
+            "questions": [],
+            "overall_score": 0,
+            "overall_suggestions": "AI返回格式异常，无法正常解析批改结果。",
+            "parsing_error": True,
+            "raw_response": text[:1000]  # 保留前1000字符用于调试
+        }
+        
+        # 尝试提取一些基本信息
+        score_match = re.search(r'(?:总分|得分|score)[:\s]*([0-9.]+)', text, re.IGNORECASE)
+        if score_match:
+            try:
+                result["overall_score"] = float(score_match.group(1))
+            except ValueError:
+                pass
+        
+        # 尝试提取建议
+        suggestion_patterns = [
+            r'(?:建议|suggestion)[:\s]*(.{1,200})',
+            r'(?:总结|summary)[:\s]*(.{1,200})',
+        ]
+        
+        for pattern in suggestion_patterns:
+            match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+            if match:
+                suggestion = match.group(1).strip()
+                if len(suggestion) > 10:  # 确保不是噪音
+                    result["overall_suggestions"] = suggestion
+                    break
+        
+        return result
+    
+    def _get_fallback_structure(self) -> Dict[str, Any]:
+        """获取默认的回退结构"""
+        return {
+            "questions": [],
+            "overall_score": 0,
+            "total_score": 0,
+            "accuracy_rate": 0.0,
+            "overall_suggestions": "未能获取到有效的批改结果",
+            "weak_knowledge_points": [],
+            "study_recommendations": []
+        }
 
 
 class QwenService(LLMService):
