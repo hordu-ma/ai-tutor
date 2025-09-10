@@ -78,21 +78,54 @@ async def test_math_knowledge_extractor_llm_error(mocker):
 
 
 @pytest.mark.asyncio
-async def test_physics_knowledge_extractor_placeholder():
+async def test_physics_knowledge_extractor_llm_call(mocker):
     """
-    Tests the PhysicsKnowledgeExtractor's current placeholder behavior.
+    Tests the PhysicsKnowledgeExtractor's real LLM call behavior for the success path.
     """
+    # 1. Setup: Create an extractor instance and mock the LLM's responses
     extractor = PhysicsKnowledgeExtractor()
-    assert extractor.get_subject() == "physics"
+    test_text = "A car accelerates from 0 to 60 mph in 10 seconds."
+    mock_llm_response_str = '''
+    {
+      "knowledge_points": [
+        {"name": "牛顿运动定律", "category": "力学"}
+      ]
+    }
+    '''
+    mock_llm_response_json = {
+        "knowledge_points": [
+            {"name": "牛顿运动定律", "category": "力学"}
+        ]
+    }
 
-    with patch('ai_tutor.services.knowledge.physics.logger.warning') as mock_logger_warning:
-        result = await extractor.extract("A car accelerates from 0 to 60 mph.")
+    # Mock the methods on the llm_service instance that will be called
+    mock_generate = mocker.patch.object(extractor.llm_service, 'generate', return_value=mock_llm_response_str)
+    mock_safe_parse = mocker.patch.object(extractor.llm_service, 'safe_json_parse', return_value=mock_llm_response_json)
 
-        # Assert that the placeholder warning was logged
-        mock_logger_warning.assert_called_with("Physics knowledge extraction is using placeholder data.")
+    # 2. Execution: Call the method under test
+    result = await extractor.extract(test_text)
 
-        # Assert that the placeholder data is returned correctly
-        assert isinstance(result, list)
-        assert len(result) == 1
-        assert result[0]['subject'] == 'physics'
-        assert result[0]['name'] == '牛顿运动定律'
+    # 3. Assertions: Verify the behavior
+    mock_generate.assert_awaited_once()
+    mock_safe_parse.assert_called_once_with(mock_llm_response_str)
+    assert result == [
+        {"name": "牛顿运动定律", "category": "力学", "subject": "physics"}
+    ]
+
+
+@pytest.mark.asyncio
+async def test_physics_knowledge_extractor_llm_error(mocker):
+    """
+    Tests the PhysicsKnowledgeExtractor's error handling when the LLM call fails.
+    """
+    # 1. Setup: Mock the generate method to raise an exception
+    extractor = PhysicsKnowledgeExtractor()
+    mocker.patch.object(extractor.llm_service, 'generate', side_effect=Exception("LLM API Error"))
+    mock_error_logger = mocker.patch('ai_tutor.services.knowledge.physics.logger.error')
+
+    # 2. Execution: Call the method under test
+    result = await extractor.extract("Some physics problem.")
+
+    # 3. Assertions: Verify the error handling
+    assert result == []
+    mock_error_logger.assert_called_once()

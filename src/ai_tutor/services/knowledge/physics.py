@@ -27,19 +27,31 @@ class PhysicsKnowledgeExtractor(KnowledgeExtractor):
     async def extract(self, text: str) -> List[Dict[str, Any]]:
         """
         Extracts physics knowledge points from the given text using an LLM.
+
+        Args:
+            text: The text content of the physics question.
+
+        Returns:
+            A list of identified knowledge points.
         """
         logger.info(f"Starting physics knowledge point extraction for text: {text[:100]}...")
 
         prompt = self._build_prompt(text)
 
-        # Placeholder logic
-        logger.warning("Physics knowledge extraction is using placeholder data.")
-        knowledge_points = [
-            {"name": "牛顿运动定律", "subject": "physics", "category": "力学"},
-        ]
+        try:
+            response_text = await self.llm_service.generate(prompt)
+            parsed_json = self.llm_service.safe_json_parse(response_text)
+            knowledge_points = self._format_response(parsed_json)
 
-        logger.info(f"Extracted {len(knowledge_points)} knowledge points.")
-        return knowledge_points
+            logger.info(f"Successfully extracted {len(knowledge_points)} knowledge points.")
+            return knowledge_points
+        except Exception as e:
+            logger.error(
+                "Failed to extract knowledge points from LLM",
+                error=str(e),
+                text=text[:200]
+            )
+            return []
 
     def _build_prompt(self, text: str) -> str:
         """Builds the prompt for the LLM to extract knowledge points."""
@@ -67,3 +79,10 @@ class PhysicsKnowledgeExtractor(KnowledgeExtractor):
         ---
         """
         return prompt.strip()
+
+    def _format_response(self, response: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Formats the LLM response into the desired output structure."""
+        points = response.get("knowledge_points", [])
+        for point in points:
+            point["subject"] = self.get_subject()
+        return points
