@@ -1,11 +1,11 @@
 """
-学生相关的Pydantic schemas定义 (简化版)
+学生相关数据模型
 """
 
+from typing import List, Optional, Any
 from datetime import datetime
-from typing import Optional, List
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from enum import Enum
-from pydantic import BaseModel, Field, ConfigDict
 
 
 class GradeEnum(str, Enum):
@@ -73,6 +73,8 @@ class StudentFilter(BaseModel):
     class_name: Optional[str] = None
     is_active: Optional[bool] = None
     has_homework: Optional[bool] = None
+    created_after: Optional[datetime] = None
+    created_before: Optional[datetime] = None
 
 
 class PaginationParams(BaseModel):

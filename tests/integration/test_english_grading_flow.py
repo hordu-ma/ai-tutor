@@ -26,7 +26,7 @@ class TestEnglishGradingFlow:
         """科目路由器"""
         return SubjectRouter()
 
-    @pytest.fixture 
+    @pytest.fixture
     def knowledge_extractor(self, mock_llm_service):
         """英语知识点提取器"""
         return EnglishKnowledgeExtractor(llm_service=mock_llm_service)
@@ -108,7 +108,10 @@ class TestEnglishGradingFlow:
 
         for case in test_cases:
             # 设置模拟响应
-            mock_llm_service.generate.return_value = str(case['mock_response'])
+            # 设置异步方法的模拟返回值
+            async def mock_generate(prompt):
+                return str(case['mock_response'])
+            mock_llm_service.generate = mock_generate
             mock_llm_service.safe_json_parse.return_value = case['mock_response']
 
             # 执行知识点提取
@@ -123,19 +126,19 @@ class TestEnglishGradingFlow:
     def test_prompt_generation_flow(self):
         """测试提示词生成流程"""
         from src.ai_tutor.services.llm.prompts.base import PromptVersion
-        
+
         # 测试不同版本的英语批改提示词
         versions = [PromptVersion.V1_0, PromptVersion.V1_1, PromptVersion.V2_0]
-        
+
         for version in versions:
             prompt_template = english_prompts.get_grading_prompt(version)
-            
+
             # 验证提示词结构
             assert prompt_template.template is not None
             assert prompt_template.version == version
             assert 'ocr_text' in prompt_template.parameters
             assert '英语' in prompt_template.description or 'English' in prompt_template.description
-            
+
             # 验证提示词内容包含关键要素
             if version == PromptVersion.V1_0:
                 assert '语法准确性' in prompt_template.template
@@ -160,7 +163,7 @@ class TestEnglishGradingFlow:
             'answer': 'went',
             'explanation': '这里需要用一般过去时，因为有yesterday这个过去时间标志词。'
         }
-        
+
         # 验证可以成功创建模型
         question = EnglishQuestion(**question_data)
         assert question.text == question_data['text']
@@ -168,14 +171,18 @@ class TestEnglishGradingFlow:
         assert question.category == EnglishCategory.GRAMMAR
         assert GrammarPointType.SIMPLE_PAST in question.grammar_points
 
-    def test_error_handling_flow(self, knowledge_extractor, mock_llm_service):
+    @pytest.mark.asyncio
+    async def test_error_handling_flow(self, knowledge_extractor, mock_llm_service):
         """测试错误处理流程"""
-        # 测试LLM服务异常处理
-        mock_llm_service.generate.side_effect = Exception("API调用失败")
-        
+        # 测试LLM服务异步异常处理
+        async def mock_generate_error(prompt):
+            raise Exception("API调用失败")
+        mock_llm_service.generate = mock_generate_error
+
         # 应该优雅处理异常，返回空结果
-        result = knowledge_extractor.extract("Some English text")
-        # 注意：这是异步函数，但在这个测试中我们只是验证异常被捕获
+        result = await knowledge_extractor.extract("Some English text")
+        # 验证异常被捕获并返回空列表
+        assert result == []
 
     @pytest.mark.asyncio
     async def test_complete_english_grading_simulation(self, subject_router, knowledge_extractor, mock_llm_service):
@@ -183,15 +190,15 @@ class TestEnglishGradingFlow:
         # 模拟一个完整的英语作业文本
         homework_text = """
         English Grammar Exercise
-        
+
         1. Fill in the blanks with correct form:
            I _____ (study) English for three years.
            She _____ (go) to London last summer.
-           
+
         2. Choose the correct answer:
            _____ you ever been to Paris?
            A) Have  B) Do  C) Are  D) Were
-           
+
         3. Translate the following sentence:
            "今天天气很好。"
         """
@@ -227,19 +234,21 @@ class TestEnglishGradingFlow:
                 }
             ]
         }
-        
-        mock_llm_service.generate.return_value = str(mock_response)
+
+        async def mock_generate_homework(prompt):
+            return str(mock_response)
+        mock_llm_service.generate = mock_generate_homework
         mock_llm_service.safe_json_parse.return_value = mock_response
-        
+
         knowledge_points = await knowledge_extractor.extract(homework_text)
-        
+
         # 验证知识点提取结果
         assert len(knowledge_points) == 3
         point_names = [point['name'] for point in knowledge_points]
         assert "现在完成时" in point_names
         assert "一般过去时" in point_names
         assert "翻译" in point_names
-        
+
         # 第三步：难度评估
         difficulty = knowledge_extractor.get_difficulty_assessment(knowledge_points)
         assert difficulty in ["基础", "中等", "高级"]
@@ -247,24 +256,24 @@ class TestEnglishGradingFlow:
     def test_english_prompt_format_consistency(self):
         """测试英语提示词格式一致性"""
         from src.ai_tutor.services.llm.prompts.base import PromptVersion
-        
+
         # 获取格式示例
         format_example = english_prompts.get_format_example()
-        
+
         # 验证JSON格式有效性
         import json
         try:
             parsed_example = json.loads(format_example)
             assert 'questions' in parsed_example
             assert 'overall_score' in parsed_example
-            
+
             # 验证英语特定字段
             if parsed_example['questions']:
                 first_question = parsed_example['questions'][0]
                 assert 'grammar_accuracy' in first_question
                 assert 'vocabulary_appropriateness' in first_question
                 assert 'fluency_score' in first_question
-                
+
         except json.JSONDecodeError:
             pytest.fail("英语批改格式示例不是有效的JSON格式")
 
@@ -301,7 +310,7 @@ class TestEnglishGradingFlow:
         """测试知识点置信度评分"""
         # 测试不同置信度的知识点提取
         test_text = "She has been studying English for five years."
-        
+
         mock_response = {
             "knowledge_points": [
                 {
@@ -311,22 +320,24 @@ class TestEnglishGradingFlow:
                 },
                 {
                     "name": "时间表达",
-                    "category": "语法", 
+                    "category": "语法",
                     "confidence": 0.7   # 中等置信度
                 }
             ]
         }
-        
-        mock_llm_service.generate.return_value = str(mock_response)
+
+        async def mock_generate_confidence(prompt):
+            return str(mock_response)
+        mock_llm_service.generate = mock_generate_confidence
         mock_llm_service.safe_json_parse.return_value = mock_response
-        
+
         result = await knowledge_extractor.extract(test_text)
-        
+
         # 验证置信度被正确保留
         confidence_scores = [point['confidence'] for point in result]
         assert 0.95 in confidence_scores
         assert 0.7 in confidence_scores
-        
+
         # 验证所有置信度在有效范围内
         for score in confidence_scores:
             assert 0 <= score <= 1
@@ -336,13 +347,13 @@ class TestEnglishGradingFlow:
         # 生成较大的英语文本
         large_text = """
         English Grammar and Vocabulary Test
-        
+
         Part I: Grammar (50 points)
         """ + "Fill in the blanks with the correct form of the verb. " * 50 + """
-        
+
         Part II: Reading Comprehension (30 points)
         """ + "Read the passage and answer the questions. " * 30 + """
-        
+
         Part III: Writing (20 points)
         """ + "Write an essay about your favorite hobby. " * 20
 
@@ -351,11 +362,11 @@ class TestEnglishGradingFlow:
         start_time = time.time()
         result = subject_router.detect_subject(large_text)
         end_time = time.time()
-        
+
         # 验证结果正确性
         assert result.primary_subject == Subject.ENGLISH
         assert result.confidence > 0.5
-        
+
         # 验证性能（应该在几秒内完成）
         processing_time = end_time - start_time
         assert processing_time < 10, f"处理时间过长: {processing_time:.2f}秒"

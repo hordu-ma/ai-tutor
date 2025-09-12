@@ -42,7 +42,7 @@ ENGLISH_KNOWLEDGE_MAP = {
 class EnglishKnowledgeExtractor(KnowledgeExtractor):
     """
     英语学科知识点提取器。
-    
+
     支持对英语学习内容进行知识点识别和分类，包括：
     - 语法规则和结构
     - 词汇分类和难度
@@ -86,11 +86,11 @@ class EnglishKnowledgeExtractor(KnowledgeExtractor):
 
     def _build_prompt(self, text: str) -> str:
         """构建用于LLM的知识点提取提示词"""
-        
+
         # 创建扁平化的知识点列表
         knowledge_list = []
         category_map = {}
-        
+
         for main_category, subcategories in ENGLISH_KNOWLEDGE_MAP.items():
             for subcategory, points in subcategories.items():
                 for point in points:
@@ -137,24 +137,24 @@ class EnglishKnowledgeExtractor(KnowledgeExtractor):
     def _format_response(self, response: Dict[str, Any]) -> List[Dict[str, Any]]:
         """格式化LLM响应为标准输出结构"""
         points = response.get("knowledge_points", [])
-        
+
         for point in points:
             # 添加学科标识
             point["subject"] = self.get_subject()
-            
+
             # 设置默认值
             if "difficulty_level" not in point:
                 point["difficulty_level"] = "中等"
             if "confidence" not in point:
                 point["confidence"] = 0.8
-            
+
             # 验证并补充分类信息
             point_name = point.get("name", "")
             if point_name in self._get_category_map():
                 category_info = self._get_category_map()[point_name]
                 point["main_category"] = category_info["main_category"]
                 point["subcategory"] = category_info["subcategory"]
-        
+
         return points
 
     def _get_category_map(self) -> Dict[str, Dict[str, str]]:
@@ -176,16 +176,16 @@ class EnglishKnowledgeExtractor(KnowledgeExtractor):
     def get_difficulty_assessment(self, knowledge_points: List[Dict[str, Any]]) -> str:
         """
         基于识别的知识点评估整体难度
-        
+
         Args:
             knowledge_points: 识别出的知识点列表
-            
+
         Returns:
             整体难度评估: 基础/中等/高级
         """
         if not knowledge_points:
             return "基础"
-        
+
         difficulty_scores = []
         for point in knowledge_points:
             difficulty = point.get("difficulty_level", "中等")
@@ -195,9 +195,9 @@ class EnglishKnowledgeExtractor(KnowledgeExtractor):
                 difficulty_scores.append(2)
             else:  # 高级
                 difficulty_scores.append(3)
-        
+
         avg_difficulty = sum(difficulty_scores) / len(difficulty_scores)
-        
+
         if avg_difficulty <= 1.3:
             return "基础"
         elif avg_difficulty <= 2.3:

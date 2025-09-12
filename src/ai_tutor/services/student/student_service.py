@@ -99,7 +99,7 @@ class StudentService(LoggerMixin):
             raise
         except IntegrityError as e:
             self.db.rollback()
-            self.log_error("数据完整性约束违反", error=str(e))
+            self.log_error("数据完整性约束违反", exception=str(e))
             raise DuplicateStudentError(
                 name=student_data.name,
                 class_name=student_data.class_name,
@@ -107,11 +107,11 @@ class StudentService(LoggerMixin):
             )
         except SQLAlchemyError as e:
             self.db.rollback()
-            self.log_error("数据库操作错误", error=str(e))
+            self.log_error("数据库操作错误", exception=str(e))
             raise DatabaseOperationError("创建学生", e)
         except Exception as e:
             self.db.rollback()
-            self.log_error("创建学生失败", error=str(e), error_type=type(e).__name__)
+            self.log_error("创建学生失败", error_msg=str(e), error_type=type(e).__name__)
             raise DatabaseOperationError("创建学生", e)
 
     async def get_student(
@@ -158,7 +158,7 @@ class StudentService(LoggerMixin):
         except StudentNotFoundError:
             raise
         except Exception as e:
-            self.log_error("获取学生信息失败", student_id=student_id, error=str(e))
+            self.log_error("获取学生信息失败", student_id=student_id, exception=str(e))
             raise DatabaseOperationError("获取学生", e)
 
     async def update_student(
@@ -232,7 +232,7 @@ class StudentService(LoggerMixin):
             raise
         except Exception as e:
             self.db.rollback()
-            self.log_error("更新学生失败", student_id=student_id, error=str(e))
+            self.log_error("更新学生失败", student_id=student_id, exception=str(e))
             raise DatabaseOperationError("更新学生", e)
 
     async def delete_student(self, student_id: int, soft_delete: bool = True) -> bool:
@@ -274,7 +274,7 @@ class StudentService(LoggerMixin):
             raise
         except Exception as e:
             self.db.rollback()
-            self.log_error("删除学生失败", student_id=student_id, error=str(e))
+            self.log_error("删除学生失败", student_id=student_id, exception=str(e))
             raise DatabaseOperationError("删除学生", e)
 
     async def list_students(
@@ -336,7 +336,7 @@ class StudentService(LoggerMixin):
             return result
 
         except Exception as e:
-            self.log_error("查询学生列表失败", error=str(e))
+            self.log_error("查询学生列表失败", exception=str(e))
             raise DatabaseOperationError("查询学生列表", e)
 
     async def search_students(
@@ -378,7 +378,7 @@ class StudentService(LoggerMixin):
             return result
 
         except Exception as e:
-            self.log_error("搜索学生失败", keyword=keyword, error=str(e))
+            self.log_error("搜索学生失败", keyword=keyword, exception=str(e))
             raise DatabaseOperationError("搜索学生", e)
 
     async def get_student_stats(self, student_id: int) -> StudentStats:
@@ -401,7 +401,7 @@ class StudentService(LoggerMixin):
         except StudentNotFoundError:
             raise
         except Exception as e:
-            self.log_error("获取学生统计失败", student_id=student_id, error=str(e))
+            self.log_error("获取学生统计失败", student_id=student_id, exception=str(e))
             raise DatabaseOperationError("获取学生统计", e)
 
     # 私有辅助方法

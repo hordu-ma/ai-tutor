@@ -3,8 +3,8 @@
 """
 import pytest
 from unittest.mock import Mock, patch
-from src.ai_tutor.services.knowledge.english import EnglishKnowledgeExtractor, ENGLISH_KNOWLEDGE_MAP
-from src.ai_tutor.services.llm.base import LLMService
+from ai_tutor.services.knowledge.english import EnglishKnowledgeExtractor, ENGLISH_KNOWLEDGE_MAP
+from ai_tutor.services.llm.base import LLMService
 
 
 class TestEnglishKnowledgeExtractor:
@@ -34,7 +34,7 @@ class TestEnglishKnowledgeExtractor:
         mock_llm_service.safe_json_parse.return_value = {
             "knowledge_points": [{
                 "name": "一般现在时",
-                "category": "语法", 
+                "category": "语法",
                 "subcategory": "时态",
                 "difficulty_level": "基础",
                 "confidence": 0.9
@@ -65,7 +65,7 @@ class TestEnglishKnowledgeExtractor:
             "knowledge_points": [{
                 "name": "主旨大意",
                 "category": "阅读理解",
-                "subcategory": "阅读技巧", 
+                "subcategory": "阅读技巧",
                 "difficulty_level": "中等",
                 "confidence": 0.85
             }]
@@ -92,7 +92,7 @@ class TestEnglishKnowledgeExtractor:
                 "name": "同义词辨析",
                 "category": "词汇",
                 "subcategory": "词汇技巧",
-                "difficulty_level": "中等", 
+                "difficulty_level": "中等",
                 "confidence": 0.8
             }]
         }
@@ -124,7 +124,7 @@ class TestEnglishKnowledgeExtractor:
         assert len(result) == 1
         assert result[0]["name"] == "段落写作"
 
-    @pytest.mark.asyncio  
+    @pytest.mark.asyncio
     async def test_extract_mixed_content(self, extractor, mock_llm_service):
         """测试中英混合内容的知识点提取"""
         mock_response = '{"knowledge_points": [{"name": "时态", "category": "语法", "subcategory": "时态", "difficulty_level": "基础", "confidence": 0.8}, {"name": "阅读理解", "category": "阅读理解", "subcategory": "阅读技巧", "difficulty_level": "中等", "confidence": 0.7}]}'
@@ -139,7 +139,7 @@ class TestEnglishKnowledgeExtractor:
                     "confidence": 0.8
                 },
                 {
-                    "name": "阅读理解", 
+                    "name": "阅读理解",
                     "category": "阅读理解",
                     "subcategory": "阅读技巧",
                     "difficulty_level": "中等",
@@ -186,11 +186,11 @@ class TestEnglishKnowledgeExtractor:
         text = "Test English content"
         prompt = extractor._build_prompt(text)
 
-        # 验证提示词包含知识点
+        # 验证提示词包含具体的知识点（而不是主分类名称）
         assert "一般现在时" in prompt
-        assert "阅读理解" in prompt
-        assert "语法" in prompt
-        assert "词汇" in prompt
+        assert "略读" in prompt  # 阅读理解分类下的具体知识点
+        assert "段落写作" in prompt  # 写作分类下的具体知识点
+        assert "日常对话" in prompt  # 听说交际分类下的具体知识点
         assert text in prompt
 
     def test_format_response_adds_subject(self, extractor):
@@ -225,7 +225,7 @@ class TestEnglishKnowledgeExtractor:
     def test_get_supported_knowledge_points(self, extractor):
         """测试获取支持的知识点结构"""
         knowledge_points = extractor.get_supported_knowledge_points()
-        
+
         assert knowledge_points == ENGLISH_KNOWLEDGE_MAP
         assert "语法" in knowledge_points
         assert "词汇" in knowledge_points
@@ -237,7 +237,7 @@ class TestEnglishKnowledgeExtractor:
             {"difficulty_level": "基础", "confidence": 0.9},
             {"difficulty_level": "基础", "confidence": 0.8}
         ]
-        
+
         difficulty = extractor.get_difficulty_assessment(knowledge_points)
         assert difficulty == "基础"
 
@@ -248,7 +248,7 @@ class TestEnglishKnowledgeExtractor:
             {"difficulty_level": "中等", "confidence": 0.8},
             {"difficulty_level": "中等", "confidence": 0.7}
         ]
-        
+
         difficulty = extractor.get_difficulty_assessment(knowledge_points)
         assert difficulty == "中等"
 
@@ -258,7 +258,7 @@ class TestEnglishKnowledgeExtractor:
             {"difficulty_level": "高级", "confidence": 0.9},
             {"difficulty_level": "高级", "confidence": 0.8}
         ]
-        
+
         difficulty = extractor.get_difficulty_assessment(knowledge_points)
         assert difficulty == "高级"
 
@@ -270,7 +270,7 @@ class TestEnglishKnowledgeExtractor:
     def test_category_map_completeness(self, extractor):
         """测试分类映射的完整性"""
         category_map = extractor._get_category_map()
-        
+
         # 验证所有知识点都在映射中
         for main_category, subcategories in ENGLISH_KNOWLEDGE_MAP.items():
             for subcategory, points in subcategories.items():
@@ -293,6 +293,6 @@ class TestEnglishKnowledgeExtractor:
         }
 
         result = await extractor.extract("Test text")
-        
+
         assert len(result) == 1
         assert result[0]["confidence"] == 0.95
