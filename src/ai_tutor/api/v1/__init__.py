@@ -20,10 +20,10 @@ async def health_check():
 from .ocr import router as ocr_router
 from .ai import router as ai_router
 from .homework import router as homework_router
-# from .student import router as student_router
+from .students import router as students_router
 
 # 注册路由
 router.include_router(ocr_router, prefix="/ocr", tags=["OCR"])
 router.include_router(ai_router, prefix="/ai", tags=["AI服务"])
 router.include_router(homework_router, prefix="/homework", tags=["作业批改"])
-# router.include_router(student_router, prefix="/student", tags=["学生"])
+router.include_router(students_router)
