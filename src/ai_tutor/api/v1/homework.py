@@ -25,7 +25,7 @@ async def grade_homework(
     作业批改接口
 
     - **file**: 作业图片文件
-    - **subject**: 科目 (math/english)
+    - **subject**: 科目 (math/english/physics)
     - **provider**: AI服务提供商 (qwen/kimi)
     """
 
@@ -180,6 +180,7 @@ async def get_supported_subjects():
     subjects = [
         {"code": "math", "name": "数学", "description": "数学作业批改"},
         {"code": "english", "name": "英语", "description": "英语作业批改"},
+        {"code": "physics", "name": "物理", "description": "物理作业批改"},
     ]
 
     return {
