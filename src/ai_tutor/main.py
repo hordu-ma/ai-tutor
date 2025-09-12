@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .core.config import settings
 from .core.logger import configure_logging, get_logger
@@ -20,14 +20,14 @@ logger = get_logger(__name__)
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     logger.info("应用启动中...")
-    
+
     # 启动时的初始化逻辑
     # TODO: 初始化数据库连接池
     # TODO: 初始化Redis连接
     # TODO: 加载AI模型配置
-    
+
     yield
-    
+
     # 关闭时的清理逻辑
     logger.info("应用关闭中...")
     # TODO: 关闭数据库连接
@@ -66,6 +66,12 @@ async def root():
     # 返回静态文件中的主页
     with open("static/index.html", "r", encoding="utf-8") as f:
         return f.read()
+
+
+@app.get("/favicon.ico")
+async def favicon():
+    """favicon.ico重定向到静态文件"""
+    return RedirectResponse(url="/static/favicon.ico")
 
 
 @app.get("/health")
