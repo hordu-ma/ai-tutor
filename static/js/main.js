@@ -12,6 +12,18 @@ document.addEventListener('DOMContentLoaded', function () {
   const loadingSpinner = submitBtn.querySelector('.loading-spinner');
   const resultSection = document.getElementById('resultSection');
   const resultContent = document.getElementById('resultContent');
+  const saveReportBtn = document.getElementById('saveReportBtn');
+  const saveOptions = document.getElementById('saveOptions');
+  const savePdfBtn = document.getElementById('savePdfBtn');
+  const saveHtmlBtn = document.getElementById('saveHtmlBtn');
+
+  // 存储当前批改数据，用于保存报告
+  let currentReportData = null;
+
+  // 初始化时隐藏保存按钮
+  if (saveReportBtn) {
+    saveReportBtn.style.display = 'none';
+  }
 
   // 文件拖拽上传功能
   fileUploadArea.addEventListener('dragover', function (e) {
@@ -133,12 +145,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // 显示结果
   function displayResult(data) {
+    // 保存当前数据用于报告生成
+    currentReportData = data;
+
     // 生成结果HTML
     const resultHTML = generateResultHTML(data);
     resultContent.innerHTML = resultHTML;
 
-    // 显示结果区域
+    // 显示结果区域和保存按钮
     resultSection.style.display = 'block';
+    if (saveReportBtn) {
+      saveReportBtn.style.display = 'inline-flex';
+    }
 
     // 平滑滚动到结果
     resultSection.scrollIntoView({ behavior: 'smooth' });
@@ -147,6 +165,13 @@ document.addEventListener('DOMContentLoaded', function () {
   // 隐藏结果
   function hideResult() {
     resultSection.style.display = 'none';
+    if (saveReportBtn) {
+      saveReportBtn.style.display = 'none';
+    }
+    if (saveOptions) {
+      saveOptions.style.display = 'none';
+    }
+    currentReportData = null;
   }
 
   // 生成结果HTML
@@ -325,6 +350,262 @@ document.addEventListener('DOMContentLoaded', function () {
         setTimeout(() => notification.remove(), 300);
       }
     }, 3000);
+  }
+
+  // 保存报告相关事件处理
+  if (saveReportBtn) {
+    saveReportBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      saveOptions.style.display = saveOptions.style.display === 'block' ? 'none' : 'block';
+    });
+  }
+
+  // 点击外部关闭保存选项
+  document.addEventListener('click', function (e) {
+    if (!saveReportBtn.contains(e.target) && !saveOptions.contains(e.target)) {
+      saveOptions.style.display = 'none';
+    }
+  });
+
+  // 保存为PDF
+  if (savePdfBtn) {
+    savePdfBtn.addEventListener('click', function () {
+      saveOptions.style.display = 'none';
+      if (currentReportData) {
+        generatePdfReport(currentReportData);
+      }
+    });
+  }
+
+  // 保存为HTML
+  if (saveHtmlBtn) {
+    saveHtmlBtn.addEventListener('click', function () {
+      saveOptions.style.display = 'none';
+      if (currentReportData) {
+        generateHtmlReport(currentReportData);
+      }
+    });
+  }
+
+  // 生成PDF报告
+  function generatePdfReport(data) {
+    try {
+      showNotification('正在生成PDF报告...', 'info');
+
+      // 创建PDF内容
+      const reportContent = generateReportContent(data);
+      const filename = `作业批改报告_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.pdf`;
+
+      // 使用简单的方法：创建一个新窗口并打印
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>作业批改报告</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
+            .section { margin-bottom: 25px; }
+            .question-card { border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 8px; }
+            .correct { border-left: 4px solid #28a745; }
+            .incorrect { border-left: 4px solid #dc3545; }
+            .metadata { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 20px; }
+            @media print { body { margin: 0; } }
+          </style>
+        </head>
+        <body>${reportContent}</body>
+        </html>
+      `);
+      printWindow.document.close();
+
+      setTimeout(() => {
+        printWindow.print();
+        showNotification('PDF报告生成完成！请在打印对话框中选择"保存为PDF"', 'success');
+      }, 500);
+
+    } catch (error) {
+      console.error('PDF生成失败:', error);
+      showNotification('PDF生成失败，请稍后重试', 'error');
+    }
+  }
+
+  // 生成HTML报告
+  function generateHtmlReport(data) {
+    try {
+      const reportContent = generateReportContent(data);
+      const filename = `作业批改报告_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.html`;
+
+      const htmlContent = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>作业批改报告</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 20px; line-height: 1.6; color: #333; }
+    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
+    .section { margin-bottom: 25px; }
+    .ocr-text { background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; font-family: 'Courier New', monospace; white-space: pre-wrap; }
+    .question-card { border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 8px; }
+    .correct { border-left: 4px solid #28a745; background: #f8fff9; }
+    .incorrect { border-left: 4px solid #dc3545; background: #fff8f8; }
+    .question-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; font-weight: bold; }
+    .question-status.correct { color: #28a745; }
+    .question-status.incorrect { color: #dc3545; }
+    .answer-section, .analysis-section { margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 6px; }
+    .knowledge-tag { display: inline-block; background: #007bff; color: white; padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; margin: 2px; }
+    .metadata { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 20px; font-size: 0.9rem; color: #6c757d; }
+    .overall-score { text-align: center; font-size: 2rem; font-weight: bold; color: #007bff; margin: 20px 0; }
+  </style>
+</head>
+<body>
+  ${reportContent}
+</body>
+</html>`;
+
+      // 创建下载链接
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showNotification('HTML报告保存成功！', 'success');
+    } catch (error) {
+      console.error('HTML生成失败:', error);
+      showNotification('HTML报告生成失败，请稍后重试', 'error');
+    }
+  }
+
+  // 生成报告内容
+  function generateReportContent(data) {
+    const { ocr_text, correction, metadata } = data;
+    const currentTime = new Date().toLocaleString('zh-CN');
+
+    let content = `
+      <div class="header">
+        <h1>🎓 AI Tutor 作业批改报告</h1>
+        <p>生成时间：${currentTime}</p>
+        <p>科目：${metadata.subject || '数学'} | AI模型：${metadata.provider}</p>
+      </div>
+    `;
+
+    // 总体得分
+    if (correction.overall_score !== undefined) {
+      content += `
+        <div class="section">
+          <h2>📊 总体得分</h2>
+          <div class="overall-score">${correction.overall_score}分</div>
+        </div>
+      `;
+    }
+
+    // OCR识别结果
+    content += `
+      <div class="section">
+        <h2>🔍 OCR识别结果</h2>
+        <div class="ocr-text">${escapeHtml(ocr_text)}</div>
+      </div>
+    `;
+
+    // 总体建议
+    if (correction.overall_suggestions) {
+      content += `
+        <div class="section">
+          <h2>📝 总体建议</h2>
+          <p>${escapeHtml(correction.overall_suggestions)}</p>
+        </div>
+      `;
+    }
+
+    // 题目详情
+    if (correction.questions && correction.questions.length > 0) {
+      content += '<div class="section"><h2>📋 题目详情</h2>';
+
+      correction.questions.forEach(question => {
+        const correctClass = question.is_correct ? 'correct' : 'incorrect';
+        const statusText = question.is_correct ? '✅ 正确' : '❌ 错误';
+
+        content += `
+          <div class="question-card ${correctClass}">
+            <div class="question-header">
+              <span>第 ${question.question_number || '?'} 题</span>
+              <span class="question-status ${correctClass}">${statusText}</span>
+              <span>${question.score || 0}/${question.max_score || 0} 分</span>
+            </div>
+
+            ${question.question_text ? `
+              <div class="answer-section">
+                <h4>📝 题目内容</h4>
+                <p>${escapeHtml(question.question_text)}</p>
+              </div>
+            ` : ''}
+
+            ${question.student_answer ? `
+              <div class="answer-section">
+                <h4>✏️ 学生答案</h4>
+                <p>${escapeHtml(question.student_answer)}</p>
+              </div>
+            ` : ''}
+
+            ${question.correct_answer ? `
+              <div class="answer-section">
+                <h4>✅ 正确答案</h4>
+                <p>${escapeHtml(question.correct_answer)}</p>
+              </div>
+            ` : ''}
+
+            ${question.error_analysis ? `
+              <div class="analysis-section">
+                <h4>🔍 错误分析</h4>
+                <p>${escapeHtml(question.error_analysis)}</p>
+              </div>
+            ` : ''}
+
+            ${question.solution_steps && question.solution_steps.length > 0 ? `
+              <div class="analysis-section">
+                <h4>📚 解题步骤</h4>
+                <ol>
+                  ${question.solution_steps.map(step => `<li>${escapeHtml(step)}</li>`).join('')}
+                </ol>
+              </div>
+            ` : ''}
+
+            ${question.knowledge_points && question.knowledge_points.length > 0 ? `
+              <div style="margin-top: 15px;">
+                <h4>🎯 涉及知识点</h4>
+                ${question.knowledge_points.map(point =>
+          `<span class="knowledge-tag">${escapeHtml(point)}</span>`
+        ).join('')}
+              </div>
+            ` : ''}
+          </div>
+        `;
+      });
+
+      content += '</div>';
+    }
+
+    // 元数据信息
+    content += `
+      <div class="metadata">
+        <h3>📋 处理信息</h3>
+        <p><strong>文件名：</strong>${metadata.filename || '未知'}</p>
+        <p><strong>处理时间：</strong>${metadata.processing_time}秒</p>
+        <p><strong>文件大小：</strong>${(metadata.file_size / 1024 / 1024).toFixed(2)}MB</p>
+        <p><strong>AI模型：</strong>${metadata.provider}</p>
+        <p><strong>题目数量：</strong>${metadata.questions_parsed || 0}题</p>
+        <p><strong>生成时间：</strong>${currentTime}</p>
+      </div>
+    `;
+
+    return content;
   }
 
   // 添加动画样式

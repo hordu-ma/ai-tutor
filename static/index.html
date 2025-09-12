@@ -1,92 +1,128 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Tutor - 学情管理AI助教</title>
-    <link rel="stylesheet" href="/static/css/style.css">
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1>🎓 AI Tutor - 学情管理AI助教</h1>
-            <p class="subtitle">基于AI的中学生数学和英语学情管理系统</p>
-        </header>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>AI Tutor - 学情管理AI助教</title>
+        <link rel="stylesheet" href="/static/css/style.css" />
+    </head>
+    <body>
+        <div class="container">
+            <header>
+                <h1>🎓 AI Tutor - 学情管理AI助教</h1>
+                <p class="subtitle">基于AI的中学生数学和英语学情管理系统</p>
+            </header>
 
-        <main>
-            <!-- 作业上传区域 -->
-            <section class="upload-section">
-                <h2>📝 作业批改</h2>
-                <form id="homeworkForm" class="upload-form">
-                    <div class="form-group">
-                        <label for="subject">选择科目：</label>
-                        <select id="subject" name="subject" required>
-                            <option value="math">数学</option>
-                            <option value="english">英语</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="provider">AI模型：</label>
-                        <select id="provider" name="provider">
-                            <option value="qwen">通义千问</option>
-                            <option value="kimi">Kimi</option>
-                        </select>
-                    </div>
-
-                    <div class="file-upload-area" id="fileUploadArea">
-                        <input type="file" id="homeworkFile" name="file" accept="image/*" required>
-                        <div class="upload-placeholder">
-                            <div class="upload-icon">📷</div>
-                            <p>点击选择作业图片或拖拽到此处</p>
-                            <p class="file-hint">支持 JPG、PNG、WEBP 格式，最大 10MB</p>
+            <main>
+                <!-- 作业上传区域 -->
+                <section class="upload-section">
+                    <h2>📝 作业批改</h2>
+                    <form id="homeworkForm" class="upload-form">
+                        <div class="form-group">
+                            <label for="subject">选择科目：</label>
+                            <select id="subject" name="subject" required>
+                                <option value="math">数学</option>
+                                <option value="english">英语</option>
+                            </select>
                         </div>
-                        <div class="file-preview" id="filePreview" style="display: none;">
-                            <img id="previewImage" src="" alt="预览图片">
-                            <p id="fileName"></p>
+
+                        <div class="form-group">
+                            <label for="provider">AI模型：</label>
+                            <select id="provider" name="provider">
+                                <option value="qwen">通义千问</option>
+                                <option value="kimi">Kimi</option>
+                            </select>
+                        </div>
+
+                        <div class="file-upload-area" id="fileUploadArea">
+                            <input
+                                type="file"
+                                id="homeworkFile"
+                                name="file"
+                                accept="image/*"
+                                required
+                            />
+                            <div class="upload-placeholder">
+                                <div class="upload-icon">📷</div>
+                                <p>点击选择作业图片或拖拽到此处</p>
+                                <p class="file-hint">
+                                    支持 JPG、PNG、WEBP 格式，最大 10MB
+                                </p>
+                            </div>
+                            <div
+                                class="file-preview"
+                                id="filePreview"
+                                style="display: none"
+                            >
+                                <img id="previewImage" src="" alt="预览图片" />
+                                <p id="fileName"></p>
+                            </div>
+                        </div>
+
+                        <button type="submit" id="submitBtn" class="submit-btn">
+                            <span class="btn-text">开始批改</span>
+                            <div class="loading-spinner" style="display: none"></div>
+                        </button>
+                    </form>
+                </section>
+
+                <!-- 结果展示区域 -->
+                <section
+                    class="result-section"
+                    id="resultSection"
+                    style="display: none"
+                >
+                    <div class="result-header">
+                        <h2>📊 批改结果</h2>
+                        <div class="result-actions">
+                            <button id="saveReportBtn" class="save-btn">
+                                <span class="save-icon">💾</span>
+                                <span>保存报告</span>
+                            </button>
+                            <div
+                                id="saveOptions"
+                                class="save-options"
+                                style="display: none"
+                            >
+                                <button id="savePdfBtn" class="save-option-btn">
+                                    <span>📄 保存为PDF</span>
+                                </button>
+                                <button id="saveHtmlBtn" class="save-option-btn">
+                                    <span>🌐 保存为HTML</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
+                    <div class="result-content" id="resultContent">
+                        <!-- 动态生成内容 -->
+                    </div>
+                </section>
 
-                    <button type="submit" id="submitBtn" class="submit-btn">
-                        <span class="btn-text">开始批改</span>
-                        <div class="loading-spinner" style="display: none;"></div>
-                    </button>
-                </form>
-            </section>
+                <!-- API文档链接 -->
+                <section class="links-section">
+                    <h2>🔗 相关链接</h2>
+                    <div class="links-grid">
+                        <a href="/docs" class="link-card">
+                            <h3>📚 API文档</h3>
+                            <p>查看完整的API接口文档</p>
+                        </a>
+                        <a href="/api/v1/health" class="link-card">
+                            <h3>💚 健康检查</h3>
+                            <p>检查系统服务状态</p>
+                        </a>
+                        <a href="/api/v1/homework/health" class="link-card">
+                            <h3>🔧 批改服务</h3>
+                            <p>检查作业批改服务状态</p>
+                        </a>
+                    </div>
+                </section>
+            </main>
 
-            <!-- 结果展示区域 -->
-            <section class="result-section" id="resultSection" style="display: none;">
-                <h2>📊 批改结果</h2>
-                <div class="result-content" id="resultContent">
-                    <!-- 动态生成内容 -->
-                </div>
-            </section>
+            <footer>
+                <p>&copy; 2024 AI Tutor. 让AI成为每个学生的专属助教。</p>
+            </footer>
+        </div>
 
-            <!-- API文档链接 -->
-            <section class="links-section">
-                <h2>🔗 相关链接</h2>
-                <div class="links-grid">
-                    <a href="/docs" class="link-card">
-                        <h3>📚 API文档</h3>
-                        <p>查看完整的API接口文档</p>
-                    </a>
-                    <a href="/api/v1/health" class="link-card">
-                        <h3>💚 健康检查</h3>
-                        <p>检查系统服务状态</p>
-                    </a>
-                    <a href="/api/v1/homework/health" class="link-card">
-                        <h3>🔧 批改服务</h3>
-                        <p>检查作业批改服务状态</p>
-                    </a>
-                </div>
-            </section>
-        </main>
-
-        <footer>
-            <p>&copy; 2024 AI Tutor. 让AI成为每个学生的专属助教。</p>
-        </footer>
-    </div>
-
-    <script src="/static/js/main.js"></script>
-</body>
+        <script src="/static/js/main.js"></script>
+    </body>
 </html>

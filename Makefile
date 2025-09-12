@@ -7,6 +7,8 @@ help:
 	@echo "可用命令:"
 	@echo "  install       - 安装项目依赖"
 	@echo "  dev          - 启动开发服务器"
+	@echo "  dev-stable   - 启动开发服务器（稳定模式）"
+	@echo "  dev-debug    - 使用调试脚本启动"
 	@echo "  test         - 运行测试"
 	@echo "  lint         - 代码质量检查"
 	@echo "  format       - 代码格式化"
@@ -23,6 +25,16 @@ install:
 dev:
 	@echo "🚀 启动开发服务器..."
 	uv run uvicorn src.ai_tutor.main:app --reload --host 0.0.0.0 --port 8000
+
+# 启动开发服务器（稳定模式，无reload）
+dev-stable:
+	@echo "🚀 启动开发服务器（稳定模式）..."
+	uv run uvicorn src.ai_tutor.main:app --host 0.0.0.0 --port 8000
+
+# 使用调试脚本启动
+dev-debug:
+	@echo "🔧 使用调试脚本启动服务器..."
+	uv run python debug_server.py
 
 # 运行测试
 test:

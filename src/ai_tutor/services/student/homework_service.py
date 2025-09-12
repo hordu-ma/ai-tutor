@@ -1,6 +1,7 @@
 """
 作业批改核心服务
 """
+
 import time
 from typing import Dict, Any, Optional
 from PIL import Image
@@ -44,84 +45,159 @@ class HomeworkService(LoggerMixin):
     ) -> Dict[str, Any]:
         """端到端批改流程：OCR -> LLM评阅 -> 结构化结果"""
         t0 = time.time()
-        
-        # 1) OCR文本提取
-        ocr_text = await self.ocr.extract_text(image)
-        
-        # 1.5) 文本分析和预处理
-        text_analysis = self.text_analyzer.extract_key_features(ocr_text)
-        self.log_event("文本分析完成", **{k: v for k, v in text_analysis.items() if not isinstance(v, (list, dict))})
-        
-        # 1.6) 题目结构化解析
-        parsed_questions = self.question_parser.parse_questions(ocr_text)
-        self.log_event("题目解析完成", parsed_questions_count=len(parsed_questions))
 
-        # 2) 获取提示词模板并组织Prompt
-        subject_lower = subject.lower()
-        if subject_lower in SUBJECT_PROMPTS_MAP:
-            # 使用专门的科目提示词
-            prompt_provider = SUBJECT_PROMPTS_MAP[subject_lower]
-            prompt_template = prompt_provider.get_grading_prompt(PromptVersion.V1_0)
-            format_example = prompt_provider.get_format_example() if hasattr(prompt_provider, 'get_format_example') else ""
-            prompt = prompt_template.format(ocr_text=ocr_text, format_example=format_example)
-        else:
-            # 回退到通用提示词
-            subject_cn = SUBJECT_CN_MAP.get(subject_lower, subject)
-            prompt = f"""你是一个严格且有耐心的中学{subject_cn}老师，请对以下作业进行批改。
+        try:
+            self.log_event("开始作业批改", subject=subject, provider=self.provider)
+
+            # 1) OCR文本提取
+            self.log_event("开始OCR文本提取")
+            ocr_text = await self.ocr.extract_text(image)
+            self.log_event(
+                "OCR文本提取完成",
+                text_length=len(ocr_text),
+                text_preview=ocr_text[:100],
+            )
+
+            # 1.5) 文本分析和预处理
+            self.log_event("开始文本分析")
+            text_analysis = self.text_analyzer.extract_key_features(ocr_text)
+            self.log_event(
+                "文本分析完成",
+                **{
+                    k: v
+                    for k, v in text_analysis.items()
+                    if not isinstance(v, (list, dict))
+                },
+            )
+
+            # 1.6) 题目结构化解析
+            self.log_event("开始题目解析")
+            parsed_questions = self.question_parser.parse_questions(ocr_text)
+            self.log_event("题目解析完成", parsed_questions_count=len(parsed_questions))
+
+            # 2) 获取提示词模板并组织Prompt
+            subject_lower = subject.lower()
+            self.log_event("开始构建提示词", subject=subject_lower)
+            if subject_lower in SUBJECT_PROMPTS_MAP:
+                # 使用专门的科目提示词
+                prompt_provider = SUBJECT_PROMPTS_MAP[subject_lower]
+                prompt_template = prompt_provider.get_grading_prompt(PromptVersion.V1_0)
+                format_example = (
+                    prompt_provider.get_format_example()
+                    if hasattr(prompt_provider, "get_format_example")
+                    else ""
+                )
+                prompt = prompt_template.format(
+                    ocr_text=ocr_text, format_example=format_example
+                )
+                self.log_event(
+                    "使用专门提示词", prompt_provider=type(prompt_provider).__name__
+                )
+            else:
+                # 回退到通用提示词
+                subject_cn = SUBJECT_CN_MAP.get(subject_lower, subject)
+                prompt = f"""你是一个严格且有耐心的中学{subject_cn}老师，请对以下作业进行批改。
 要求：严格输出JSON格式的批改结果。
 作业OCR文本如下：
 ---
 {ocr_text}
 ---
 请直接返回JSON。"""
-        
-        llm_response = await self.llm.generate(prompt, max_tokens=1800, temperature=0.2)
+                self.log_event("使用通用提示词", subject_cn=subject_cn)
 
-        # 3) 使用增强的JSON解析方法
-        parsed: Dict[str, Any] = self.llm.safe_json_parse(
-            llm_response, 
-            fallback_parser=self._create_homework_fallback_parser(ocr_text)
-        )
+            self.log_event("提示词构建完成", prompt_length=len(prompt))
 
-        elapsed = time.time() - t0
-        result = {
-            "provider": self.provider,
-            "ocr_text": ocr_text,
-            "correction": parsed,
-            "processing_time": round(elapsed, 2),
-            # 新增的结构化解析信息
-            "text_analysis": {
-                "quality_score": text_analysis.get("ocr_confidence", 0.5),
-                "complexity_score": text_analysis.get("complexity_score", 0.5),
-                "subject_indicators": text_analysis.get("subject_indicators", []),
-                "grade_level_estimate": text_analysis.get("grade_level_estimate", "未知"),
-                "question_patterns": text_analysis.get("question_patterns", []),
-                "mathematical_content": text_analysis.get("mathematical_content", {})
-            },
-            "parsed_questions": [
-                {
-                    "question_number": q.question_number,
-                    "question_text": q.question_text,
-                    "question_type": q.question_type.value,
-                    "student_answer": q.student_answer,
-                    "confidence": q.confidence,
-                    "answer_regions_count": len(q.answer_regions)
-                } for q in parsed_questions
-            ]
-        }
-        self.log_event("批改完成", 
-                      provider=self.provider, 
-                      processing_time=elapsed,
-                      questions_parsed=len(parsed_questions),
-                      avg_confidence=sum(q.confidence for q in parsed_questions) / max(len(parsed_questions), 1))
-        return result
-    
+            # 3) 调用LLM进行批改
+            self.log_event("开始LLM批改", provider=self.provider)
+            llm_response = await self.llm.generate(
+                prompt, max_tokens=1800, temperature=0.2
+            )
+            self.log_event("LLM批改完成", response_length=len(llm_response))
+
+            # 4) 使用增强的JSON解析方法
+            self.log_event("开始解析LLM响应")
+            parsed: Dict[str, Any] = self.llm.safe_json_parse(
+                llm_response,
+                fallback_parser=self._create_homework_fallback_parser(ocr_text),
+            )
+            self.log_event("LLM响应解析完成", parsed_type=type(parsed).__name__)
+
+            elapsed = time.time() - t0
+            result = {
+                "provider": self.provider,
+                "ocr_text": ocr_text,
+                "correction": parsed,
+                "processing_time": round(elapsed, 2),
+                # 新增的结构化解析信息
+                "text_analysis": {
+                    "quality_score": text_analysis.get("ocr_confidence", 0.5),
+                    "complexity_score": text_analysis.get("complexity_score", 0.5),
+                    "subject_indicators": text_analysis.get("subject_indicators", []),
+                    "grade_level_estimate": text_analysis.get(
+                        "grade_level_estimate", "未知"
+                    ),
+                    "question_patterns": text_analysis.get("question_patterns", []),
+                    "mathematical_content": text_analysis.get(
+                        "mathematical_content", {}
+                    ),
+                },
+                "parsed_questions": [
+                    {
+                        "question_number": q.question_number,
+                        "question_text": q.question_text,
+                        "question_type": q.question_type.value,
+                        "student_answer": q.student_answer,
+                        "confidence": q.confidence,
+                        "answer_regions_count": len(q.answer_regions),
+                    }
+                    for q in parsed_questions
+                ],
+            }
+            self.log_event(
+                "批改完成",
+                provider=self.provider,
+                processing_time=elapsed,
+                questions_parsed=len(parsed_questions),
+                avg_confidence=sum(q.confidence for q in parsed_questions)
+                / max(len(parsed_questions), 1),
+            )
+            return result
+
+        except Exception as e:
+            elapsed = time.time() - t0
+            self.log_error(
+                "作业批改失败",
+                error_msg=str(e),
+                error_type=type(e).__name__,
+                subject=subject,
+                provider=self.provider,
+                processing_time=elapsed,
+            )
+
+            # 返回错误信息而不是抛出异常，便于调试
+            return {
+                "provider": self.provider,
+                "ocr_text": getattr(locals(), "ocr_text", ""),
+                "correction": {
+                    "error": True,
+                    "error_message": str(e),
+                    "error_type": type(e).__name__,
+                    "questions": [],
+                    "overall_score": 0,
+                    "overall_suggestions": f"批改过程中发生错误: {str(e)}",
+                },
+                "processing_time": round(elapsed, 2),
+                "text_analysis": {},
+                "parsed_questions": [],
+            }
+
     def _create_homework_fallback_parser(self, ocr_text: str) -> callable:
         """创建作业批改的降级解析器"""
+
         def homework_fallback_parser(text: str) -> Dict[str, Any]:
             """作业批改的特定降级解析器"""
             import re
-            
+
             result = {
                 "questions": [],
                 "overall_score": 0,
@@ -130,32 +206,36 @@ class HomeworkService(LoggerMixin):
                 "overall_suggestions": "解析AI回答失败，但尝试提取了部分信息。",
                 "weak_knowledge_points": [],
                 "study_recommendations": [],
-                "parsing_fallback": True
+                "parsing_fallback": True,
             }
-            
+
             # 尝试提取分数信息
             score_patterns = [
-                r'(?:总分|得分|总体得分|overall_score)[:\s]*([0-9.]+)',
-                r'score[:\s]*([0-9.]+)',
-                r'(分数)[:\s]*([0-9.]+)',
+                r"(?:总分|得分|总体得分|overall_score)[:\s]*([0-9.]+)",
+                r"score[:\s]*([0-9.]+)",
+                r"(分数)[:\s]*([0-9.]+)",
             ]
-            
+
             for pattern in score_patterns:
                 match = re.search(pattern, text, re.IGNORECASE)
                 if match:
                     try:
-                        score = float(match.group(1) if len(match.groups()) == 1 else match.group(2))
+                        score = float(
+                            match.group(1)
+                            if len(match.groups()) == 1
+                            else match.group(2)
+                        )
                         result["overall_score"] = score
                         break
                     except ValueError:
                         continue
-            
+
             # 尝试提取题目信息
             question_patterns = [
-                r'(题目|question)\s*([0-9]+)',
-                r'([0-9]+)\s*[\.\)]\s*(.{1,100})',
+                r"(题目|question)\s*([0-9]+)",
+                r"([0-9]+)\s*[\.\)]\s*(.{1,100})",
             ]
-            
+
             questions_found = []
             for pattern in question_patterns:
                 matches = re.finditer(pattern, text, re.IGNORECASE)
@@ -172,18 +252,18 @@ class HomeworkService(LoggerMixin):
                             "error_analysis": "解析失败",
                             "solution_steps": [],
                             "knowledge_points": [],
-                            "difficulty_level": 3
+                            "difficulty_level": 3,
                         }
                         questions_found.append(question_data)
-            
+
             result["questions"] = questions_found
-            
+
             # 尝试提取建议
             suggestion_patterns = [
-                r'(?:建议|总结|suggestion|summary)[:\s]*(.{20,300})',
-                r'(?:需要改进|学习建议)[:\s]*(.{20,200})',
+                r"(?:建议|总结|suggestion|summary)[:\s]*(.{20,300})",
+                r"(?:需要改进|学习建议)[:\s]*(.{20,200})",
             ]
-            
+
             for pattern in suggestion_patterns:
                 match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
                 if match:
@@ -191,8 +271,7 @@ class HomeworkService(LoggerMixin):
                     if len(suggestion) > 15:  # 确保有意义
                         result["overall_suggestions"] = suggestion[:300]  # 限制长度
                         break
-            
-            return result
-        
-        return homework_fallback_parser
 
+            return result
+
+        return homework_fallback_parser

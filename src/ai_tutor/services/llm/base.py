@@ -3,6 +3,7 @@ AI大模型服务基础模块
 """
 import json
 import re
+import asyncio
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional, Union
 import httpx
@@ -182,13 +183,41 @@ class QwenService(LLMService):
     def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None):
         self.api_key = api_key or settings.QWEN_API_KEY
         self.base_url = base_url or settings.QWEN_BASE_URL
-        self.client = httpx.AsyncClient(timeout=30.0)
+        self.client = httpx.AsyncClient(timeout=60.0)  # 增加超时时间到60秒
+        self.max_retries = 3  # 最大重试次数
+        self.retry_delay = 2  # 重试延迟（秒）
         
         if not self.api_key:
             raise ValueError("Qwen API key 未配置")
     
     async def chat(self, messages: List[Dict[str, str]], **kwargs) -> str:
-        """调用通义千问聊天接口"""
+        """调用通义千问聊天接口（支持重试）"""
+        for attempt in range(self.max_retries):
+            try:
+                return await self._chat_single_attempt(messages, **kwargs)
+            except (httpx.TimeoutException, httpx.ConnectTimeout, httpx.ReadTimeout) as e:
+                if attempt < self.max_retries - 1:
+                    self.log_event(
+                        "API调用超时，准备重试",
+                        attempt=attempt + 1,
+                        max_retries=self.max_retries,
+                        delay_seconds=self.retry_delay
+                    )
+                    await asyncio.sleep(self.retry_delay * (attempt + 1))  # 递增延迟
+                    continue
+                else:
+                    # 最后一次重试也失败了
+                    self.log_error("所有重试尝试都失败", attempts=self.max_retries)
+                    raise e
+            except Exception as e:
+                # 非超时异常不重试，直接抛出
+                raise e
+        
+        # 这里不应该到达，但为了安全起见
+        raise Exception("所有重试尝试都失败")
+    
+    async def _chat_single_attempt(self, messages: List[Dict[str, str]], **kwargs) -> str:
+        """单次API调用尝试"""
         try:
             # 准备请求数据
             data = {
@@ -231,12 +260,27 @@ class QwenService(LLMService):
             
             return content.strip()
             
+        except httpx.TimeoutException:
+            self.log_error("Qwen API请求超时", timeout_seconds=60.0)
+            raise  # 让上层重试机制处理
+        except httpx.ConnectTimeout:
+            self.log_error("Qwen API连接超时")
+            raise  # 让上层重试机制处理
+        except httpx.ReadTimeout:
+            self.log_error("Qwen API读取超时")
+            raise  # 让上层重试机制处理
         except httpx.HTTPStatusError as e:
-            self.log_error("Qwen API HTTP错误", status_code=e.response.status_code, response=e.response.text)
-            raise Exception(f"Qwen API调用失败: {e.response.status_code}")
+            error_detail = e.response.text if hasattr(e.response, 'text') else str(e)
+            self.log_error("Qwen API HTTP错误", 
+                          status_code=e.response.status_code, 
+                          response=error_detail[:500])
+            raise Exception(f"Qwen API调用失败 (HTTP {e.response.status_code}): {error_detail[:200]}")
         except Exception as e:
-            self.log_error("Qwen API调用异常", exception_msg=str(e))
-            raise Exception(f"Qwen API调用异常: {str(e)}")
+            error_msg = str(e) if str(e) else f"{type(e).__name__}: 未知错误"
+            self.log_error("Qwen API调用异常", 
+                          exception_type=type(e).__name__, 
+                          exception_msg=error_msg)
+            raise Exception(f"Qwen API调用异常: {error_msg}")
     
     async def generate(self, prompt: str, **kwargs) -> str:
         """生成文本"""
@@ -256,13 +300,38 @@ class KimiService(LLMService):
     def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None):
         self.api_key = api_key or settings.KIMI_API_KEY
         self.base_url = base_url or settings.KIMI_BASE_URL
-        self.client = httpx.AsyncClient(timeout=30.0)
+        self.client = httpx.AsyncClient(timeout=60.0)  # 增加超时时间到60秒
+        self.max_retries = 3  # 最大重试次数
+        self.retry_delay = 2  # 重试延迟（秒）
         
         if not self.api_key:
             raise ValueError("Kimi API key 未配置")
     
     async def chat(self, messages: List[Dict[str, str]], **kwargs) -> str:
-        """调用Kimi聊天接口"""
+        """调用Kimi聊天接口（支持重试）"""
+        for attempt in range(self.max_retries):
+            try:
+                return await self._chat_single_attempt(messages, **kwargs)
+            except (httpx.TimeoutException, httpx.ConnectTimeout, httpx.ReadTimeout) as e:
+                if attempt < self.max_retries - 1:
+                    self.log_event(
+                        "Kimi API调用超时，准备重试",
+                        attempt=attempt + 1,
+                        max_retries=self.max_retries,
+                        delay_seconds=self.retry_delay
+                    )
+                    await asyncio.sleep(self.retry_delay * (attempt + 1))
+                    continue
+                else:
+                    self.log_error("Kimi API所有重试尝试都失败", attempts=self.max_retries)
+                    raise e
+            except Exception as e:
+                raise e
+        
+        raise Exception("Kimi API所有重试尝试都失败")
+    
+    async def _chat_single_attempt(self, messages: List[Dict[str, str]], **kwargs) -> str:
+        """单次Kimi API调用尝试"""
         try:
             # 准备请求数据
             data = {
@@ -305,12 +374,27 @@ class KimiService(LLMService):
             
             return content.strip()
             
+        except httpx.TimeoutException:
+            self.log_error("Kimi API请求超时", timeout_seconds=60.0)
+            raise  # 让上层重试机制处理
+        except httpx.ConnectTimeout:
+            self.log_error("Kimi API连接超时")
+            raise  # 让上层重试机制处理
+        except httpx.ReadTimeout:
+            self.log_error("Kimi API读取超时")
+            raise  # 让上层重试机制处理
         except httpx.HTTPStatusError as e:
-            self.log_error("Kimi API HTTP错误", status_code=e.response.status_code, response=e.response.text)
-            raise Exception(f"Kimi API调用失败: {e.response.status_code}")
+            error_detail = e.response.text if hasattr(e.response, 'text') else str(e)
+            self.log_error("Kimi API HTTP错误", 
+                          status_code=e.response.status_code, 
+                          response=error_detail[:500])
+            raise Exception(f"Kimi API调用失败 (HTTP {e.response.status_code}): {error_detail[:200]}")
         except Exception as e:
-            self.log_error("Kimi API调用异常", exception_msg=str(e))
-            raise Exception(f"Kimi API调用异常: {str(e)}")
+            error_msg = str(e) if str(e) else f"{type(e).__name__}: 未知错误"
+            self.log_error("Kimi API调用异常", 
+                          exception_type=type(e).__name__, 
+                          exception_msg=error_msg)
+            raise Exception(f"Kimi API调用异常: {error_msg}")
     
     async def generate(self, prompt: str, **kwargs) -> str:
         """生成文本"""

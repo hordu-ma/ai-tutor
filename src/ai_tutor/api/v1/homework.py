@@ -23,12 +23,12 @@ async def grade_homework(
 ):
     """
     作业批改接口
-    
+
     - **file**: 作业图片文件
     - **subject**: 科目 (math/english)
     - **provider**: AI服务提供商 (qwen/kimi)
     """
-    
+
     # 验证文件类型
     if file.content_type not in settings.ALLOWED_IMAGE_TYPES:
         logger.warning("不支持的文件类型", content_type=file.content_type)
@@ -36,7 +36,7 @@ async def grade_homework(
             status_code=400,
             detail=f"不支持的文件类型: {file.content_type}"
         )
-    
+
     # 验证文件大小
     file_content = await file.read()
     if len(file_content) > settings.MAX_FILE_SIZE:
@@ -45,28 +45,95 @@ async def grade_homework(
             status_code=400,
             detail=f"文件过大。最大支持 {settings.MAX_FILE_SIZE // (1024*1024)}MB"
         )
-    
+
     try:
-        # 加载图片
-        image = Image.open(BytesIO(file_content))
-        
-        # 初始化作业批改服务
-        homework_service = HomeworkService(provider=provider)
-        
-        # 执行批改
-        result = await homework_service.grade_homework(
-            image=image,
-            subject=subject
+        logger.info(
+            "开始处理作业批改请求",
+            filename=file.filename,
+            subject=subject,
+            provider=provider,
+            file_size=len(file_content)
         )
-        
+
+        # 加载图片
+        try:
+            image = Image.open(BytesIO(file_content))
+            logger.info("图片加载成功", filename=file.filename, image_size=image.size, image_mode=image.mode)
+        except Exception as img_error:
+            logger.error("图片加载失败", filename=file.filename, error=str(img_error))
+            raise HTTPException(
+                status_code=400,
+                detail=f"图片格式错误或损坏: {str(img_error)}"
+            )
+
+        # 初始化作业批改服务
+        try:
+            homework_service = HomeworkService(provider=provider)
+            logger.info("作业批改服务初始化成功", provider=provider)
+        except Exception as service_error:
+            logger.error("作业批改服务初始化失败", provider=provider, error=str(service_error))
+            raise HTTPException(
+                status_code=503,
+                detail=f"服务初始化失败，请检查配置: {str(service_error)}"
+            )
+
+        # 执行批改
+        try:
+            result = await homework_service.grade_homework(
+                image=image,
+                subject=subject
+            )
+
+            # 检查是否有错误
+            if result.get("correction", {}).get("error"):
+                logger.warning(
+                    "批改过程中出现错误",
+                    filename=file.filename,
+                    error_message=result["correction"].get("error_message"),
+                    error_type=result["correction"].get("error_type")
+                )
+
+                return JSONResponse(
+                    status_code=500,
+                    content={
+                        "success": False,
+                        "error": {
+                            "type": result["correction"].get("error_type", "Unknown"),
+                            "message": result["correction"].get("error_message", "批改过程中发生未知错误"),
+                            "details": {
+                                "filename": file.filename,
+                                "subject": subject,
+                                "provider": provider,
+                                "processing_time": result["processing_time"]
+                            }
+                        },
+                        "message": "作业批改失败"
+                    }
+                )
+
+        except Exception as grading_error:
+            logger.error(
+                "作业批改执行异常",
+                filename=file.filename,
+                subject=subject,
+                provider=provider,
+                error=str(grading_error),
+                error_type=type(grading_error).__name__
+            )
+            raise HTTPException(
+                status_code=500,
+                detail=f"批改执行失败: {str(grading_error)}"
+            )
+
         logger.info(
             "作业批改完成",
             filename=file.filename,
             subject=subject,
             provider=provider,
-            processing_time=result["processing_time"]
+            processing_time=result["processing_time"],
+            questions_count=len(result.get("parsed_questions", []))
         )
-        
+
         return JSONResponse(
             status_code=200,
             content={
@@ -79,15 +146,28 @@ async def grade_homework(
                         "subject": subject,
                         "provider": provider,
                         "processing_time": result["processing_time"],
-                        "file_size": len(file_content)
+                        "file_size": len(file_content),
+                        "questions_parsed": len(result.get("parsed_questions", [])),
+                        "text_analysis": result.get("text_analysis", {})
                     }
                 },
                 "message": "作业批改完成"
             }
         )
-        
+
+    except HTTPException:
+        # 重新抛出HTTP异常
+        raise
     except Exception as e:
-        logger.error("作业批改失败", filename=file.filename, error=str(e))
+        logger.error(
+            "作业批改失败",
+            filename=file.filename,
+            subject=subject,
+            provider=provider,
+            error=str(e),
+            error_type=type(e).__name__,
+            file_size=len(file_content)
+        )
         raise HTTPException(
             status_code=500,
             detail=f"作业批改失败: {str(e)}"
@@ -101,7 +181,7 @@ async def get_supported_subjects():
         {"code": "math", "name": "数学", "description": "数学作业批改"},
         {"code": "english", "name": "英语", "description": "英语作业批改"},
     ]
-    
+
     return {
         "success": True,
         "data": subjects,
@@ -116,11 +196,11 @@ async def homework_health():
         # 测试OCR服务
         from ...services.ocr import get_ocr_service
         ocr_service = get_ocr_service()
-        
+
         # 测试AI服务
         from ...services.llm import get_llm_service
         ai_service = get_llm_service("qwen")
-        
+
         return {
             "status": "healthy",
             "services": {
@@ -129,7 +209,7 @@ async def homework_health():
                 "homework_service": "ready"
             }
         }
-        
+
     except Exception as e:
         logger.error("作业批改服务健康检查失败", error=str(e))
         return JSONResponse(
