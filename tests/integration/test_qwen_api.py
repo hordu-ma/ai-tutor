@@ -4,21 +4,23 @@
 """
 import asyncio
 import httpx
+import pytest
 from src.ai_tutor.core.config import settings
 
+@pytest.mark.asyncio
 async def test_qwen_api():
     """测试 Qwen API 连接"""
-    
+
     # 基础配置检查
     print("=== 配置检查 ===")
     print(f"API Key 配置状态: {'已配置' if settings.QWEN_API_KEY else '未配置'}")
     print(f"API Key 长度: {len(settings.QWEN_API_KEY) if settings.QWEN_API_KEY else 0}")
     print(f"Base URL: {settings.QWEN_BASE_URL}")
-    
+
     if not settings.QWEN_API_KEY:
         print("❌ QWEN_API_KEY 未配置")
         return
-    
+
     # 测试网络连通性
     print("\n=== 网络连通性测试 ===")
     try:
@@ -28,10 +30,10 @@ async def test_qwen_api():
     except Exception as e:
         print(f"❌ 网络连接失败: {e}")
         return
-    
+
     # 测试API调用
     print("\n=== API调用测试 ===")
-    
+
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             data = {
@@ -40,21 +42,21 @@ async def test_qwen_api():
                 "temperature": 0.2,
                 "max_tokens": 100
             }
-            
+
             headers = {
                 "Authorization": f"Bearer {settings.QWEN_API_KEY}",
                 "Content-Type": "application/json"
             }
-            
+
             print("发送测试请求...")
             response = await client.post(
                 f"{settings.QWEN_BASE_URL}/chat/completions",
                 json=data,
                 headers=headers
             )
-            
+
             print(f"响应状态码: {response.status_code}")
-            
+
             if response.status_code == 200:
                 result = response.json()
                 content = result["choices"][0]["message"]["content"]
@@ -64,12 +66,12 @@ async def test_qwen_api():
             else:
                 print(f"❌ API调用失败: {response.status_code}")
                 print(f"响应内容: {response.text}")
-                
+
     except httpx.TimeoutException:
         print("❌ 请求超时")
     except httpx.ConnectTimeout:
         print("❌ 连接超时")
-    except httpx.ReadTimeout:  
+    except httpx.ReadTimeout:
         print("❌ 读取超时")
     except httpx.HTTPStatusError as e:
         print(f"❌ HTTP错误: {e.response.status_code}")

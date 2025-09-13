@@ -8,10 +8,12 @@
 import asyncio
 import sys
 from pathlib import Path
+import pytest
 
 # 添加项目路径
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
+@pytest.mark.asyncio
 async def test_physics_support():
     """测试物理科目支持"""
 

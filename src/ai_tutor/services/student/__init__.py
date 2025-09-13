@@ -4,6 +4,7 @@
 
 from .homework_service import HomeworkService
 from .student_service import StudentService
+from .progress_service import ProgressService, get_progress_service
 from .exceptions import (
     StudentServiceError,
     StudentNotFoundError,
@@ -16,6 +17,8 @@ from .exceptions import (
 __all__ = [
     "HomeworkService",
     "StudentService",
+    "ProgressService",
+    "get_progress_service",
     "StudentServiceError",
     "StudentNotFoundError",
     "DuplicateStudentError",
