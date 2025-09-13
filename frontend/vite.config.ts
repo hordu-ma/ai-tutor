@@ -40,6 +40,14 @@ export default defineConfig({
       dts: 'src/types/components.d.ts',
     }),
   ],
+  optimizeDeps: {
+    include: ['echarts', 'vue-router', 'element-plus'],
+  },
+  build: {
+    rollupOptions: {
+      external: [],
+    },
+  },
   server: {
     port: 6173,
     // Proxy API requests to the backend server in development
