@@ -20,7 +20,7 @@
             </div>
         </el-card>
 
-        <!-- Main Dashboard Content -->
+        <!-- First Row: Knowledge Mastery & Learning Progress Trend -->
         <el-row :gutter="24" style="margin-top: 20px">
             <!-- Knowledge Mastery Radar Chart -->
             <el-col :xl="12" :lg="24">
@@ -84,16 +84,16 @@
                 </el-card>
             </el-col>
 
-            <!-- Error Patterns Analysis -->
+            <!-- Learning Progress Trend Chart -->
             <el-col :xl="12" :lg="24">
                 <el-card class="chart-card">
                     <template #header>
                         <div class="card-header">
-                            <el-icon><Warning /></el-icon>
-                            <span>近期错误模式</span>
+                            <el-icon><TrendCharts /></el-icon>
+                            <span>学习进度趋势</span>
                             <el-select
-                                v-model="errorPatternTimeframe"
-                                @change="loadErrorPatterns"
+                                v-model="progressTimeRange"
+                                @change="loadProgressTrend"
                                 size="small"
                                 style="margin-left: auto; width: 120px"
                             >
@@ -103,44 +103,188 @@
                             </el-select>
                         </div>
                     </template>
-                    <div class="error-patterns-container">
+                    <div class="chart-container">
                         <div
-                            v-if="isLoadingErrors"
+                            v-if="isLoadingProgressTrend"
                             class="loading-placeholder"
                             v-loading="true"
-                            element-loading-text="正在加载错误模式..."
+                            element-loading-text="正在加载趋势数据..."
                         />
-                        <div v-else-if="errorPatterns.length === 0" class="no-data">
-                            <el-empty description="未找到错误模式" :image-size="60" />
+                        <div
+                            v-else
+                            ref="progressTrendChart"
+                            class="chart-element"
+                        ></div>
+                    </div>
+                </el-card>
+            </el-col>
+        </el-row>
+
+        <!-- Second Row: Subject Comparison & Error Statistics -->
+        <el-row :gutter="24" style="margin-top: 20px">
+            <!-- Subject Performance Comparison -->
+            <el-col :xl="12" :lg="24">
+                <el-card class="chart-card">
+                    <template #header>
+                        <div class="card-header">
+                            <el-icon><DataAnalysis /></el-icon>
+                            <span>各科目成绩对比</span>
+                            <el-button-group size="small" style="margin-left: auto">
+                                <el-button
+                                    :type="chartViewMode === 'scores' ? 'primary' : ''"
+                                    @click="
+                                        chartViewMode = 'scores';
+                                        renderSubjectComparisonChart();
+                                    "
+                                    size="small"
+                                >
+                                    分数
+                                </el-button>
+                                <el-button
+                                    :type="
+                                        chartViewMode === 'accuracy' ? 'primary' : ''
+                                    "
+                                    @click="
+                                        chartViewMode = 'accuracy';
+                                        renderSubjectComparisonChart();
+                                    "
+                                    size="small"
+                                >
+                                    正确率
+                                </el-button>
+                            </el-button-group>
                         </div>
-                        <div v-else class="error-patterns-list">
-                            <div
-                                v-for="pattern in errorPatterns"
-                                :key="pattern.pattern_type"
-                                class="error-pattern-item"
+                    </template>
+                    <div class="chart-container">
+                        <div
+                            v-if="isLoadingSubjectComparison"
+                            class="loading-placeholder"
+                            v-loading="true"
+                            element-loading-text="正在加载对比数据..."
+                        />
+                        <div
+                            v-else
+                            ref="subjectComparisonChart"
+                            class="chart-element"
+                        ></div>
+                    </div>
+                </el-card>
+            </el-col>
+
+            <!-- Error Statistics Pie Chart -->
+            <el-col :xl="12" :lg="24">
+                <el-card class="chart-card">
+                    <template #header>
+                        <div class="card-header">
+                            <el-icon><Warning /></el-icon>
+                            <span>错误类型统计</span>
+                            <el-select
+                                v-model="errorStatsSubject"
+                                @change="loadErrorStatistics"
+                                size="small"
+                                style="margin-left: auto; width: 100px"
                             >
-                                <div class="pattern-header">
-                                    <el-tag
-                                        :type="getTrendType(pattern.trend)"
-                                        size="small"
-                                    >
-                                        {{ pattern.pattern_type }}
-                                    </el-tag>
-                                    <span class="frequency"
-                                        >{{ pattern.frequency }} 次</span
-                                    >
-                                </div>
-                                <div class="pattern-description">
-                                    {{ pattern.description }}
-                                </div>
-                                <div class="pattern-trend">
-                                    <el-icon :class="getTrendIconClass(pattern.trend)">
-                                        <component :is="getTrendIcon(pattern.trend)" />
-                                    </el-icon>
-                                    <span>{{
-                                        getTrendDisplayName(pattern.trend)
-                                    }}</span>
-                                </div>
+                                <el-option label="全部" value="all" />
+                                <el-option label="数学" value="math" />
+                                <el-option label="物理" value="physics" />
+                                <el-option label="英语" value="english" />
+                            </el-select>
+                        </div>
+                    </template>
+                    <div class="chart-container">
+                        <div
+                            v-if="isLoadingErrorStats"
+                            class="loading-placeholder"
+                            v-loading="true"
+                            element-loading-text="正在加载错误统计..."
+                        />
+                        <div v-else ref="errorStatsChart" class="chart-element"></div>
+                    </div>
+                </el-card>
+            </el-col>
+        </el-row>
+
+        <!-- Third Row: Learning Time Heatmap & Quick Stats -->
+        <el-row :gutter="24" style="margin-top: 20px">
+            <!-- Learning Time Distribution Heatmap -->
+            <el-col :xl="16" :lg="24">
+                <el-card class="chart-card">
+                    <template #header>
+                        <div class="card-header">
+                            <el-icon><Clock /></el-icon>
+                            <span>学习时间分布热力图</span>
+                            <el-date-picker
+                                v-model="heatmapDateRange"
+                                type="daterange"
+                                range-separator="至"
+                                start-placeholder="开始日期"
+                                end-placeholder="结束日期"
+                                size="small"
+                                style="margin-left: auto; width: 240px"
+                                @change="loadLearningTimeHeatmap"
+                            />
+                        </div>
+                    </template>
+                    <div class="chart-container">
+                        <div
+                            v-if="isLoadingHeatmap"
+                            class="loading-placeholder"
+                            v-loading="true"
+                            element-loading-text="正在加载热力图..."
+                        />
+                        <div
+                            v-else
+                            ref="learningHeatmapChart"
+                            class="chart-element"
+                        ></div>
+                    </div>
+                </el-card>
+            </el-col>
+
+            <!-- Quick Statistics -->
+            <el-col :xl="8" :lg="24">
+                <el-card class="stats-card">
+                    <template #header>
+                        <div class="card-header">
+                            <el-icon><DataAnalysis /></el-icon>
+                            <span>学习统计</span>
+                        </div>
+                    </template>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-icon">
+                                <el-icon><TrendCharts /></el-icon>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-number">{{ weeklyProgress }}%</div>
+                                <div class="stat-label">本周进步</div>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-icon">
+                                <el-icon><Clock /></el-icon>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-number">{{ totalStudyTime }}h</div>
+                                <div class="stat-label">总学习时长</div>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-icon">
+                                <el-icon><Warning /></el-icon>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-number">{{ errorReductionRate }}%</div>
+                                <div class="stat-label">错误减少率</div>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-icon">
+                                <el-icon><ArrowUp /></el-icon>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-number">{{ improvementPoints }}</div>
+                                <div class="stat-label">改进知识点</div>
                             </div>
                         </div>
                     </div>
@@ -244,7 +388,9 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, nextTick } from "vue";
+// @ts-ignore
+import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import {
     DataAnalysis,
@@ -255,13 +401,12 @@ import {
     Clock,
     Refresh,
     TrendCharts,
-    Bottom,
-    Top,
 } from "@element-plus/icons-vue";
+// @ts-ignore
+import echarts from "echarts";
 import {
     apiService,
     type KnowledgePoint,
-    type StudentErrorPattern,
     type ImprovementPlan as ImprovementPlanType,
 } from "@/services/api";
 import ImprovementPlan from "@/components/ImprovementPlan.vue";
@@ -274,20 +419,51 @@ const studentName = ref("学生");
 
 // Dashboard state
 const isLoadingKnowledge = ref(false);
-const isLoadingErrors = ref(false);
+
+const isLoadingProgressTrend = ref(false);
+const isLoadingSubjectComparison = ref(false);
+const isLoadingErrorStats = ref(false);
+const isLoadingHeatmap = ref(false);
 const knowledgeError = ref(false);
 const selectedSubject = ref<"math" | "physics" | "english">("math");
-const errorPatternTimeframe = ref(30);
+
 const activeImprovementTab = ref("math");
+
+// New chart controls
+const progressTimeRange = ref(30);
+const chartViewMode = ref<"scores" | "accuracy">("scores");
+const errorStatsSubject = ref("all");
+const heatmapDateRange = ref<[Date, Date]>([
+    new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+    new Date(),
+]);
 
 // Data
 const knowledgePoints = ref<KnowledgePoint[]>([]);
-const errorPatterns = ref<StudentErrorPattern[]>([]);
+
 const improvementPlans = ref<{
     math?: ImprovementPlanType;
     physics?: ImprovementPlanType;
     english?: ImprovementPlanType;
 }>({});
+
+// Chart data
+const progressTrendData = ref<any[]>([]);
+const subjectComparisonData = ref<any[]>([]);
+const errorStatsData = ref<any[]>([]);
+const learningHeatmapData = ref<any[]>([]);
+
+// Chart refs
+const progressTrendChart = ref<HTMLElement>();
+const subjectComparisonChart = ref<HTMLElement>();
+const errorStatsChart = ref<HTMLElement>();
+const learningHeatmapChart = ref<HTMLElement>();
+
+// Chart instances
+let progressTrendChartInstance: echarts.ECharts | null = null;
+let subjectComparisonChartInstance: echarts.ECharts | null = null;
+let errorStatsChartInstance: echarts.ECharts | null = null;
+let learningHeatmapChartInstance: echarts.ECharts | null = null;
 
 // Computed properties
 const filteredKnowledgePoints = computed(() => {
@@ -297,16 +473,31 @@ const filteredKnowledgePoints = computed(() => {
 });
 
 const totalAssignments = computed(() => {
-    // In a real app, this would be calculated from actual data
-    return 15;
+    return 23;
 });
 
 const averageScore = computed(() => {
-    // Calculate average mastery level
     const points = filteredKnowledgePoints.value;
     if (points.length === 0) return 0;
     const sum = points.reduce((acc, point) => acc + point.mastery_level, 0);
     return Math.round(sum / points.length);
+});
+
+// New computed properties for enhanced stats
+const weeklyProgress = computed(() => {
+    return 12.5;
+});
+
+const totalStudyTime = computed(() => {
+    return 45.2;
+});
+
+const errorReductionRate = computed(() => {
+    return 18.3;
+});
+
+const improvementPoints = computed(() => {
+    return 15;
 });
 
 // Methods
@@ -326,25 +517,6 @@ const loadKnowledgeData = async () => {
     }
 };
 
-const loadErrorPatterns = async () => {
-    isLoadingErrors.value = true;
-
-    try {
-        const data = await apiService.getStudentErrorPatterns(
-            studentId.value,
-            selectedSubject.value,
-            errorPatternTimeframe.value,
-        );
-        errorPatterns.value = data;
-    } catch (error) {
-        console.error("Failed to load error patterns:", error);
-        ElMessage.error("加载错误模式失败");
-        errorPatterns.value = [];
-    } finally {
-        isLoadingErrors.value = false;
-    }
-};
-
 const loadImprovementPlan = async (subject: string) => {
     try {
         const plan = await apiService.getImprovementPlan(studentId.value, subject);
@@ -357,7 +529,6 @@ const loadImprovementPlan = async (subject: string) => {
 
 const handleSubjectChange = (newSubject: string | number | boolean | undefined) => {
     selectedSubject.value = newSubject as "math" | "physics" | "english";
-    loadErrorPatterns();
 };
 
 const handleImprovementTabChange = (tabName: string | number) => {
@@ -375,71 +546,368 @@ const getMasteryColor = (level: number) => {
     return "#909399";
 };
 
-const getTrendType = (trend: string) => {
-    switch (trend) {
-        case "increasing":
-            return "danger";
-        case "decreasing":
-            return "success";
-        case "stable":
-            return "warning";
-        default:
-            return "info";
+// New chart methods
+const loadProgressTrend = async () => {
+    isLoadingProgressTrend.value = true;
+    try {
+        // Mock data - in real app, call API
+        const mockData = [
+            { date: "2024-11-01", math: 75, physics: 68, english: 82 },
+            { date: "2024-11-08", math: 78, physics: 72, english: 85 },
+            { date: "2024-11-15", math: 82, physics: 75, english: 87 },
+            { date: "2024-11-22", math: 85, physics: 78, english: 89 },
+            { date: "2024-11-29", math: 87, physics: 82, english: 91 },
+        ];
+        progressTrendData.value = mockData;
+        await nextTick();
+        renderProgressTrendChart();
+    } catch (error) {
+        console.error("Failed to load progress trend:", error);
+        ElMessage.error("加载进度趋势失败");
+    } finally {
+        isLoadingProgressTrend.value = false;
     }
 };
 
-const getTrendIcon = (trend: string) => {
-    switch (trend) {
-        case "increasing":
-            return Top;
-        case "decreasing":
-            return Bottom;
-        case "stable":
-            return TrendCharts;
-        default:
-            return TrendCharts;
+const loadSubjectComparison = async () => {
+    isLoadingSubjectComparison.value = true;
+    try {
+        // Mock data
+        const mockData = [
+            { subject: "数学", score: 87, accuracy: 0.85 },
+            { subject: "物理", score: 82, accuracy: 0.78 },
+            { subject: "英语", score: 91, accuracy: 0.92 },
+        ];
+        subjectComparisonData.value = mockData;
+        await nextTick();
+        renderSubjectComparisonChart();
+    } catch (error) {
+        console.error("Failed to load subject comparison:", error);
+        ElMessage.error("加载科目对比失败");
+    } finally {
+        isLoadingSubjectComparison.value = false;
     }
 };
 
-const getTrendIconClass = (trend: string) => {
-    switch (trend) {
-        case "increasing":
-            return "trend-icon trend-up";
-        case "decreasing":
-            return "trend-icon trend-down";
-        case "stable":
-            return "trend-icon trend-stable";
-        default:
-            return "trend-icon";
+const loadErrorStatistics = async () => {
+    isLoadingErrorStats.value = true;
+    try {
+        // Mock data
+        const mockData = [
+            { name: "计算错误", value: 15, color: "#ff6b6b" },
+            { name: "概念混淆", value: 8, color: "#4ecdc4" },
+            { name: "逻辑错误", value: 5, color: "#45aaf2" },
+            { name: "粗心大意", value: 12, color: "#96ceb4" },
+            { name: "理解不足", value: 7, color: "#feca57" },
+        ];
+        errorStatsData.value = mockData;
+        await nextTick();
+        renderErrorStatsChart();
+    } catch (error) {
+        console.error("Failed to load error statistics:", error);
+        ElMessage.error("加载错误统计失败");
+    } finally {
+        isLoadingErrorStats.value = false;
     }
 };
 
-const getTrendDisplayName = (trend: string) => {
-    switch (trend) {
-        case "increasing":
-            return "上升";
-        case "decreasing":
-            return "下降";
-        case "stable":
-            return "稳定";
-        default:
-            return trend;
+const loadLearningTimeHeatmap = async () => {
+    isLoadingHeatmap.value = true;
+    try {
+        // Mock heatmap data
+        const mockData = [];
+        const startDate = new Date(heatmapDateRange.value[0]);
+        const endDate = new Date(heatmapDateRange.value[1]);
+
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+            for (let hour = 0; hour < 24; hour++) {
+                mockData.push([
+                    d.toISOString().split("T")[0],
+                    hour,
+                    Math.floor(Math.random() * 120), // minutes
+                ]);
+            }
+        }
+        learningHeatmapData.value = mockData;
+        await nextTick();
+        renderLearningHeatmapChart();
+    } catch (error) {
+        console.error("Failed to load learning heatmap:", error);
+        ElMessage.error("加载学习热力图失败");
+    } finally {
+        isLoadingHeatmap.value = false;
     }
+};
+
+// Chart rendering methods
+const renderProgressTrendChart = () => {
+    if (!progressTrendChart.value) return;
+
+    if (progressTrendChartInstance) {
+        progressTrendChartInstance.dispose();
+    }
+
+    progressTrendChartInstance = echarts.init(progressTrendChart.value);
+
+    const option = {
+        title: {
+            text: "学习进度趋势",
+            left: "center",
+            textStyle: { fontSize: 14, color: "#333" },
+        },
+        tooltip: {
+            trigger: "axis",
+            axisPointer: { type: "line" },
+        },
+        legend: {
+            data: ["数学", "物理", "英语"],
+            bottom: 0,
+        },
+        grid: {
+            left: "3%",
+            right: "4%",
+            bottom: "15%",
+            top: "15%",
+            containLabel: true,
+        },
+        xAxis: {
+            type: "category",
+            data: progressTrendData.value.map((item) => item.date.slice(5)),
+        },
+        yAxis: {
+            type: "value",
+            min: 0,
+            max: 100,
+            axisLabel: {
+                formatter: "{value}%",
+            },
+        },
+        series: [
+            {
+                name: "数学",
+                type: "line",
+                data: progressTrendData.value.map((item) => item.math),
+                smooth: true,
+                lineStyle: { color: "#5470c6" },
+                itemStyle: { color: "#5470c6" },
+            },
+            {
+                name: "物理",
+                type: "line",
+                data: progressTrendData.value.map((item) => item.physics),
+                smooth: true,
+                lineStyle: { color: "#91cc75" },
+                itemStyle: { color: "#91cc75" },
+            },
+            {
+                name: "英语",
+                type: "line",
+                data: progressTrendData.value.map((item) => item.english),
+                smooth: true,
+                lineStyle: { color: "#fac858" },
+                itemStyle: { color: "#fac858" },
+            },
+        ],
+    };
+
+    progressTrendChartInstance.setOption(option);
+};
+
+const renderSubjectComparisonChart = () => {
+    if (!subjectComparisonChart.value) return;
+
+    if (subjectComparisonChartInstance) {
+        subjectComparisonChartInstance.dispose();
+    }
+
+    subjectComparisonChartInstance = echarts.init(subjectComparisonChart.value);
+
+    const isScoreMode = chartViewMode.value === "scores";
+
+    const formatter = isScoreMode ? "{value}分" : "{value}%";
+
+    const option = {
+        title: {
+            text: isScoreMode ? "各科目平均分数" : "各科目正确率",
+            left: "center",
+            textStyle: { fontSize: 14, color: "#333" },
+        },
+        tooltip: {
+            trigger: "axis",
+            axisPointer: { type: "shadow" },
+        },
+        grid: {
+            left: "3%",
+            right: "4%",
+            bottom: "3%",
+            top: "15%",
+            containLabel: true,
+        },
+        xAxis: {
+            type: "category",
+            data: subjectComparisonData.value.map((item) => item.subject),
+        },
+        yAxis: {
+            type: "value",
+            axisLabel: { formatter },
+        },
+        series: [
+            {
+                type: "bar",
+                data: subjectComparisonData.value.map((item) =>
+                    isScoreMode ? item.score : Math.round(item.accuracy * 100),
+                ),
+                itemStyle: {
+                    color: function (params: any) {
+                        const colors = ["#5470c6", "#91cc75", "#fac858"];
+                        return colors[params.dataIndex % colors.length];
+                    },
+                },
+                label: {
+                    show: true,
+                    position: "top",
+                    formatter: isScoreMode ? "{c}分" : "{c}%",
+                },
+            },
+        ],
+    };
+
+    subjectComparisonChartInstance.setOption(option);
+};
+
+const renderErrorStatsChart = () => {
+    if (!errorStatsChart.value) return;
+
+    if (errorStatsChartInstance) {
+        errorStatsChartInstance.dispose();
+    }
+
+    errorStatsChartInstance = echarts.init(errorStatsChart.value);
+
+    const option = {
+        title: {
+            text: "错误类型分布",
+            left: "center",
+            textStyle: { fontSize: 14, color: "#333" },
+        },
+        tooltip: {
+            trigger: "item",
+            formatter: "{b}: {c}次 ({d}%)",
+        },
+        legend: {
+            orient: "vertical",
+            left: "left",
+            top: "middle",
+        },
+        series: [
+            {
+                type: "pie",
+                radius: ["40%", "70%"],
+                center: ["60%", "50%"],
+                data: errorStatsData.value,
+                emphasis: {
+                    itemStyle: {
+                        shadowBlur: 10,
+                        shadowOffsetX: 0,
+                        shadowColor: "rgba(0, 0, 0, 0.5)",
+                    },
+                },
+                label: {
+                    formatter: "{b}\n{c}次",
+                },
+            },
+        ],
+    };
+
+    errorStatsChartInstance.setOption(option);
+};
+
+const renderLearningHeatmapChart = () => {
+    if (!learningHeatmapChart.value) return;
+
+    if (learningHeatmapChartInstance) {
+        learningHeatmapChartInstance.dispose();
+    }
+
+    learningHeatmapChartInstance = echarts.init(learningHeatmapChart.value);
+
+    const hours = Array.from({ length: 24 }, (_, i) => i + "h");
+    const days = Array.from(
+        new Set(learningHeatmapData.value.map((item) => item[0])),
+    ).sort();
+
+    const option = {
+        title: {
+            text: "学习时间分布热力图",
+            left: "center",
+            textStyle: { fontSize: 14, color: "#333" },
+        },
+        tooltip: {
+            position: "top",
+            formatter: function (params: any) {
+                const [date, hour, minutes] = params.data;
+                return `${date} ${hour}:00<br/>学习时长: ${minutes}分钟`;
+            },
+        },
+        grid: {
+            height: "50%",
+            top: "15%",
+            left: "10%",
+            right: "5%",
+        },
+        xAxis: {
+            type: "category",
+            data: hours,
+            splitArea: { show: true },
+        },
+        yAxis: {
+            type: "category",
+            data: days,
+            splitArea: { show: true },
+        },
+        visualMap: {
+            min: 0,
+            max: 120,
+            calculable: true,
+            orient: "horizontal",
+            left: "center",
+            bottom: "5%",
+            inRange: {
+                color: ["#ffffff", "#4ecdc4", "#44a08d"],
+            },
+            text: ["高", "低"],
+            textStyle: { color: "#333" },
+        },
+        series: [
+            {
+                type: "heatmap",
+                data: learningHeatmapData.value,
+                label: {
+                    show: false,
+                },
+                emphasis: {
+                    itemStyle: {
+                        shadowBlur: 10,
+                        shadowColor: "rgba(0, 0, 0, 0.5)",
+                    },
+                },
+            },
+        ],
+    };
+
+    learningHeatmapChartInstance.setOption(option);
 };
 
 const getSubjectDisplayName = (subject: string) => {
-    switch (subject) {
-        case "math":
-            return "数学";
-        case "physics":
-            return "物理";
-        case "english":
-            return "英语";
-        default:
-            return subject;
-    }
+    const names: Record<string, string> = {
+        math: "数学",
+        physics: "物理",
+        english: "英语",
+    };
+    return names[subject] || subject;
 };
 
+// Navigation methods
 const navigateToQuickAnalysis = () => {
     router.push("/quick-analysis");
 };
@@ -449,70 +917,98 @@ const navigateToHistory = () => {
 };
 
 const refreshDashboard = async () => {
-    ElMessage.info("正在刷新仪表盘数据...");
+    ElMessage.info("正在刷新数据...");
     await Promise.all([
         loadKnowledgeData(),
-        loadErrorPatterns(),
-        loadImprovementPlan("math"),
-        loadImprovementPlan("physics"),
-        loadImprovementPlan("english"),
+        loadProgressTrend(),
+        loadSubjectComparison(),
+        loadErrorStatistics(),
+        loadLearningTimeHeatmap(),
     ]);
-    ElMessage.success("仪表盘数据刷新完成！");
+    ElMessage.success("数据刷新完成");
 };
 
-// Initialize dashboard
+// Window resize handler
+const handleResize = () => {
+    if (progressTrendChartInstance) {
+        progressTrendChartInstance.resize();
+    }
+    if (subjectComparisonChartInstance) {
+        subjectComparisonChartInstance.resize();
+    }
+    if (errorStatsChartInstance) {
+        errorStatsChartInstance.resize();
+    }
+    if (learningHeatmapChartInstance) {
+        learningHeatmapChartInstance.resize();
+    }
+};
+
+// Lifecycle
 onMounted(async () => {
+    // Load initial data
     await Promise.all([
         loadKnowledgeData(),
-        loadErrorPatterns(),
-        loadImprovementPlan("math"),
+        loadProgressTrend(),
+        loadSubjectComparison(),
+        loadErrorStatistics(),
+        loadLearningTimeHeatmap(),
     ]);
+
+    // Load improvement plans
+    loadImprovementPlan("math");
+
+    // Add resize listener
+    window.addEventListener("resize", handleResize);
+});
+
+// Cleanup
+onUnmounted(() => {
+    window.removeEventListener("resize", handleResize);
+
+    if (progressTrendChartInstance) {
+        progressTrendChartInstance.dispose();
+    }
+    if (subjectComparisonChartInstance) {
+        subjectComparisonChartInstance.dispose();
+    }
+    if (errorStatsChartInstance) {
+        errorStatsChartInstance.dispose();
+    }
+    if (learningHeatmapChartInstance) {
+        learningHeatmapChartInstance.dispose();
+    }
 });
 </script>
 
 <style scoped>
 .dashboard-container {
-    max-width: 1400px;
-    margin: 0 auto;
+    padding: 20px;
 }
 
 .welcome-card {
-    border-radius: 12px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border: none;
-}
-
-.welcome-card :deep(.el-card__body) {
-    padding: 24px;
+    margin-bottom: 20px;
 }
 
 .welcome-content {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    color: white;
 }
 
-.welcome-text {
-    flex: 1;
-}
-
-.welcome-title {
-    font-size: 28px;
-    font-weight: 700;
+.welcome-text h2 {
     margin: 0 0 8px 0;
-    color: white;
+    color: #303133;
 }
 
 .welcome-subtitle {
-    font-size: 16px;
-    opacity: 0.9;
+    color: #606266;
     margin: 0;
 }
 
 .welcome-stats {
     display: flex;
-    gap: 40px;
+    gap: 30px;
 }
 
 .stat-item {
@@ -520,64 +1016,61 @@ onMounted(async () => {
 }
 
 .stat-number {
-    font-size: 32px;
-    font-weight: 700;
-    line-height: 1;
+    font-size: 28px;
+    font-weight: bold;
+    color: #409eff;
+    margin-bottom: 4px;
 }
 
 .stat-label {
+    color: #909399;
     font-size: 14px;
-    opacity: 0.8;
-    margin-top: 4px;
 }
 
-.chart-card,
-.improvement-card,
-.quick-actions-card {
-    border-radius: 8px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+.chart-card {
+    height: 400px;
+}
+
+.stats-card {
+    height: 400px;
 }
 
 .card-header {
     display: flex;
     align-items: center;
-    font-size: 16px;
-    font-weight: 600;
-    color: #303133;
-}
-
-.card-header el-icon {
-    margin-right: 8px;
-    color: #1890ff;
+    gap: 8px;
 }
 
 .chart-container {
-    min-height: 300px;
+    height: 320px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.loading-placeholder,
-.error-placeholder {
-    min-height: 200px;
+.chart-element {
+    width: 100%;
+    height: 100%;
 }
 
-.knowledge-mastery {
-    padding: 16px 0;
-}
-
-.subject-tabs {
-    margin-bottom: 20px;
+.loading-placeholder {
+    height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .mastery-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 16px;
+    margin-top: 16px;
 }
 
 .mastery-item {
     padding: 16px;
-    border: 1px solid #e8e8e8;
-    border-radius: 6px;
+    border: 1px solid #ebeef5;
+    border-radius: 8px;
     background: #fafafa;
 }
 
@@ -589,119 +1082,111 @@ onMounted(async () => {
 }
 
 .point-name {
-    font-weight: 600;
+    font-weight: 500;
     color: #303133;
 }
 
 .mastery-score {
-    font-weight: 700;
-    color: #1890ff;
+    color: #409eff;
+    font-weight: bold;
 }
 
-.error-patterns-container {
-    min-height: 300px;
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    height: 320px;
+    align-content: start;
 }
 
-.error-patterns-list {
+.stats-grid .stat-item {
     display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.error-pattern-item {
+    align-items: center;
+    gap: 12px;
     padding: 16px;
-    border: 1px solid #e8e8e8;
-    border-radius: 6px;
-    background: #fafafa;
+    border: 1px solid #ebeef5;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    transition: transform 0.2s ease;
 }
 
-.pattern-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
+.stats-grid .stat-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-.frequency {
+.stat-icon {
+    font-size: 24px;
+    color: #409eff;
+}
+
+.stat-content {
+    flex: 1;
+}
+
+.stats-grid .stat-number {
+    font-size: 24px;
+    margin-bottom: 4px;
+}
+
+.stats-grid .stat-label {
     font-size: 12px;
-    color: #909399;
 }
 
-.pattern-description {
-    color: #606266;
-    margin-bottom: 8px;
-    line-height: 1.5;
-}
-
-.pattern-trend {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    color: #909399;
-}
-
-.trend-icon {
-    font-size: 14px;
-}
-
-.trend-up {
-    color: #f56c6c;
-}
-
-.trend-down {
-    color: #67c23a;
-}
-
-.trend-stable {
-    color: #e6a23c;
-}
-
-.improvement-tabs {
-    min-height: 200px;
+.improvement-card,
+.quick-actions-card {
+    margin-top: 20px;
 }
 
 .quick-actions {
     display: flex;
     gap: 16px;
-    flex-wrap: wrap;
+    justify-content: center;
 }
 
 .action-button {
-    flex: 1;
-    min-width: 200px;
+    height: 50px;
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
-.no-data,
-.no-plan {
-    min-height: 150px;
+.no-data {
+    height: 200px;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
-/* Responsive design */
+.subject-tabs {
+    margin-bottom: 16px;
+    text-align: center;
+}
+
 @media (max-width: 768px) {
     .welcome-content {
         flex-direction: column;
-        text-align: center;
-        gap: 20px;
+        align-items: flex-start;
+        gap: 16px;
     }
 
     .welcome-stats {
-        gap: 20px;
-    }
-
-    .mastery-grid {
-        grid-template-columns: 1fr;
+        justify-content: space-around;
+        width: 100%;
     }
 
     .quick-actions {
         flex-direction: column;
     }
 
-    .action-button {
-        min-width: auto;
+    .chart-card {
+        height: 350px;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
     }
 }
 </style>
