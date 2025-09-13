@@ -439,7 +439,7 @@ import {
     WarnTriangleFilled,
 } from "@element-plus/icons-vue";
 // @ts-ignore
-import echarts from "echarts";
+import * as echarts from "echarts";
 import { analyticsService, studentService } from "@/services/api";
 import type { MultiSubjectSummary, Student } from "@/types/student";
 

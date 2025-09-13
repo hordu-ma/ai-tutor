@@ -403,7 +403,7 @@ import {
     TrendCharts,
 } from "@element-plus/icons-vue";
 // @ts-ignore
-import echarts from "echarts";
+import * as echarts from "echarts";
 import {
     apiService,
     type KnowledgePoint,

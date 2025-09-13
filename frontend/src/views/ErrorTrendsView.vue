@@ -365,7 +365,7 @@ import {
     Minus,
 } from "@element-plus/icons-vue";
 // @ts-ignore
-import echarts from "echarts";
+import * as echarts from "echarts";
 import { analyticsService, studentService } from "@/services/api";
 import type { ErrorTrendAnalysis, Student } from "@/types/student";
 
