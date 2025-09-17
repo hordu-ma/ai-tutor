@@ -152,7 +152,7 @@ AI Tutor 系统架构
 
 ```bash
 # 检查项目状态
-npm run dev        # 前端开发服务器
+cd frontend && npm run dev        # 前端开发服务器
 make dev          # 后端开发服务器
 make test         # 运行测试套件
 make lint         # 代码质量检查
