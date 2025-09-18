@@ -170,7 +170,31 @@
                         <el-radio label="kimi">Kimi AI</el-radio>
                     </el-radio-group>
                 </el-form-item>
-                <el-form-item label="创造性">
+                <el-form-item label="模型选择">
+                    <el-select v-model="chatSettings.model" placeholder="选择模型">
+                        <el-option
+                            v-if="chatSettings.provider === 'qwen'"
+                            label="qwen-plus"
+                            value="qwen-plus"
+                        />
+                        <el-option
+                            v-if="chatSettings.provider === 'qwen'"
+                            label="qwen-max"
+                            value="qwen-max"
+                        />
+                        <el-option
+                            v-if="chatSettings.provider === 'kimi'"
+                            label="moonshot-v1-8k"
+                            value="moonshot-v1-8k"
+                        />
+                        <el-option
+                            v-if="chatSettings.provider === 'kimi'"
+                            label="moonshot-v1-32k"
+                            value="moonshot-v1-32k"
+                        />
+                    </el-select>
+                </el-form-item>
+                <el-form-item label="温度参数">
                     <el-slider
                         v-model="chatSettings.temperature"
                         :min="0"
@@ -178,7 +202,6 @@
                         :step="0.1"
                         show-input
                     />
-                    <div class="setting-help">数值越高，回答越有创意</div>
                 </el-form-item>
                 <el-form-item label="回答长度">
                     <el-input-number
@@ -243,6 +266,7 @@ const chatContext = reactive<ChatContext>({
 // 聊天设置
 const chatSettings = reactive<ChatSettings>({
     provider: "qwen",
+    model: "qwen-plus",
     temperature: 0.7,
     max_tokens: 2000,
     auto_save: true,
@@ -336,6 +360,7 @@ const sendMessage = async () => {
                     timestamp: msg.timestamp,
                 })),
             provider: chatSettings.provider,
+            model: chatSettings.model,
             temperature: chatSettings.temperature,
             max_tokens: chatSettings.max_tokens,
             context: chatContext,
@@ -376,6 +401,12 @@ const selectPrompt = (prompt: QuickPrompt) => {
 const switchProvider = (provider: "qwen" | "kimi") => {
     currentProvider.value = provider;
     chatSettings.provider = provider;
+    // 切换相应的默认模型
+    if (provider === "qwen") {
+        chatSettings.model = "qwen-plus";
+    } else if (provider === "kimi") {
+        chatSettings.model = "moonshot-v1-8k";
+    }
     ElMessage.success(`已切换到${provider === "qwen" ? "通义千问" : "Kimi AI"}`);
 };
 
