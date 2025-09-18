@@ -23,7 +23,7 @@ import type {
 
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
-const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK === 'true'
+const USE_MOCK_DATA = true // 临时启用Mock数据进行测试
 
 // Create axios instance with default config
 const apiClient = axios.create({
@@ -197,7 +197,7 @@ class ApiService {
     subject: string
   ): Promise<ImprovementPlan> {
     if (USE_MOCK_DATA) {
-      return mockApiService.getImprovementPlan(studentId, subject)
+      return mockApiService.getImprovementPlan()
     }
 
     try {
@@ -209,7 +209,7 @@ class ApiService {
       console.error('Error fetching improvement plan:', error)
       // Fallback to mock data on error
       console.warn('Falling back to mock data')
-      return mockApiService.getImprovementPlan(studentId, subject)
+      return mockApiService.getImprovementPlan()
     }
   }
 

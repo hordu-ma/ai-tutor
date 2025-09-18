@@ -511,7 +511,22 @@ const loadSummaryData = async () => {
             filters.subjects,
             filters.timeframeDays,
         );
-        summaryData.value = data;
+
+        // 添加数据验证和默认值
+        summaryData.value = data || {
+            student_id: filters.studentId,
+            analysis_period: `最近${filters.timeframeDays}天`,
+            overall_performance: {
+                total_questions: 0,
+                total_errors: 0,
+                overall_accuracy: 0,
+                improvement_trend: "stable",
+                grade_equivalent: "未知",
+            },
+            subject_comparisons: [],
+            cross_subject_patterns: [],
+            recommendations: [],
+        };
 
         // 等待DOM更新后渲染图表
         await nextTick();
@@ -519,6 +534,22 @@ const loadSummaryData = async () => {
     } catch (error) {
         console.error("加载汇总数据失败:", error);
         ElMessage.error("加载数据失败");
+
+        // 设置默认值防止undefined错误
+        summaryData.value = {
+            student_id: filters.studentId,
+            analysis_period: `最近${filters.timeframeDays}天`,
+            overall_performance: {
+                total_questions: 0,
+                total_errors: 0,
+                overall_accuracy: 0,
+                improvement_trend: "stable",
+                grade_equivalent: "未知",
+            },
+            subject_comparisons: [],
+            cross_subject_patterns: [],
+            recommendations: [],
+        };
     } finally {
         loading.value = false;
     }

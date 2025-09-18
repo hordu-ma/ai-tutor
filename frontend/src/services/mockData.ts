@@ -48,100 +48,60 @@ export const mockApiService = {
     return [
       {
         pattern_type: "计算错误",
-        frequency: 12,
-        recent_occurrences: 8,
+        frequency: 15,
+        recent_occurrences: 12,
         trend: "decreasing" as const,
-        description: "在基本四则运算中出现错误，主要集中在分数运算和负数处理上。"
+        description: "在基本四则运算中出现错误，主要集中在分数运算和负数处理上。建议加强基础运算练习。"
       },
       {
         pattern_type: "概念理解错误",
-        frequency: 6,
-        recent_occurrences: 4,
+        frequency: 8,
+        recent_occurrences: 6,
         trend: "stable" as const,
-        description: "对函数的定义域和值域概念理解不清晰，经常混淆相关概念。"
-      },
-      {
-        pattern_type: "解题步骤遗漏",
-        frequency: 9,
-        recent_occurrences: 7,
-        trend: "increasing" as const,
-        description: "在解决复杂问题时经常跳过中间步骤，导致逻辑不完整。"
+        description: "对函数的定义域和值域概念理解不清晰，经常混淆相关概念。需要回顾基础概念定义。"
       }
     ]
   },
 
   /**
-   * Mock improvement plan for a student in a specific subject
+   * Mock improvement plan
    */
-  async getImprovementPlan(_studentId: number, subject: string): Promise<ImprovementPlan> {
+  async getImprovementPlan(): Promise<ImprovementPlan> {
     await delay(600)
 
-    const plans: Record<string, ImprovementPlan> = {
-      math: {
-        focus_areas: ["基础代数", "方程求解", "函数概念"],
-        recommended_actions: [
-          "每日完成10道基础代数运算练习题",
-          "观看函数概念相关的教学视频",
-          "参加每周的数学辅导课程",
-          "建立错题本，记录和分析错误原因"
-        ],
-        difficulty_level: "中等",
-        estimated_time_weeks: 6
-      },
-      physics: {
-        focus_areas: ["力学基础", "运动学", "能量守恒"],
-        recommended_actions: [
-          "复习牛顿三定律的基本概念",
-          "练习匀速直线运动和加速运动问题",
-          "通过实验加深对物理概念的理解",
-          "多做综合性的力学计算题"
-        ],
-        difficulty_level: "初级",
-        estimated_time_weeks: 8
-      },
-      english: {
-        focus_areas: ["语法结构", "时态运用", "词汇积累"],
-        recommended_actions: [
-          "每日背诵20个新单词",
-          "练习现在时、过去时和将来时的用法",
-          "阅读英文短文并总结语法要点",
-          "参加英语口语练习活动"
-        ],
-        difficulty_level: "简单",
-        estimated_time_weeks: 4
-      }
+    return {
+      focus_areas: ["代数运算", "方程求解", "函数理解"],
+      recommended_actions: [
+        "每日20道基础运算题",
+        "每周3次方程专项练习",
+        "函数概念复习与应用"
+      ],
+      difficulty_level: "中等",
+      estimated_time_weeks: 3
     }
-
-    return plans[subject] || plans.math
   },
 
   /**
    * Mock knowledge point mastery
    */
   async getKnowledgePointMastery(): Promise<KnowledgePoint[]> {
-    await delay(1000)
+    await delay(500)
 
     return [
-      // Math knowledge points
-      { id: 1, name: "一元一次方程", subject: "math", mastery_level: 75, last_updated: "2024-01-15" },
-      { id: 2, name: "二次函数", subject: "math", mastery_level: 60, last_updated: "2024-01-14" },
-      { id: 3, name: "三角函数", subject: "math", mastery_level: 45, last_updated: "2024-01-13" },
-      { id: 4, name: "概率统计", subject: "math", mastery_level: 85, last_updated: "2024-01-16" },
-      { id: 5, name: "平面几何", subject: "math", mastery_level: 70, last_updated: "2024-01-12" },
-
-      // Physics knowledge points
-      { id: 6, name: "牛顿运动定律", subject: "physics", mastery_level: 80, last_updated: "2024-01-15" },
-      { id: 7, name: "电磁感应", subject: "physics", mastery_level: 55, last_updated: "2024-01-14" },
-      { id: 8, name: "波动光学", subject: "physics", mastery_level: 40, last_updated: "2024-01-13" },
-      { id: 9, name: "热力学", subject: "physics", mastery_level: 65, last_updated: "2024-01-16" },
-      { id: 10, name: "原子物理", subject: "physics", mastery_level: 35, last_updated: "2024-01-11" },
-
-      // English knowledge points
-      { id: 11, name: "现在时态", subject: "english", mastery_level: 90, last_updated: "2024-01-15" },
-      { id: 12, name: "过去时态", subject: "english", mastery_level: 75, last_updated: "2024-01-14" },
-      { id: 13, name: "条件语句", subject: "english", mastery_level: 50, last_updated: "2024-01-13" },
-      { id: 14, name: "被动语态", subject: "english", mastery_level: 60, last_updated: "2024-01-16" },
-      { id: 15, name: "阅读理解", subject: "english", mastery_level: 85, last_updated: "2024-01-12" }
+      {
+        id: 1,
+        name: "一元一次方程",
+        subject: "math",
+        mastery_level: 85,
+        last_updated: "2024-01-15"
+      },
+      {
+        id: 2,
+        name: "二次函数",
+        subject: "math",
+        mastery_level: 72,
+        last_updated: "2024-01-14"
+      }
     ]
   },
 
@@ -153,88 +113,124 @@ export const mockApiService = {
 
     return [
       {
-        id: "1",
-        file_name: "数学作业_第三章.jpg",
-        subject: "math" as const,
-        provider: "qwen" as const,
-        submitted_at: "2024-01-15T14:30:00Z",
-        processing_status: "completed" as const,
-        grade_score: 85,
-        file_url: "/uploads/math_homework_3.jpg",
-        analysis_id: "analysis_1"
+        id: 1,
+        student_id: 1,
+        subject: "math",
+        submission_date: "2024-01-15T14:30:00Z",
+        total_questions: 10,
+        correct_answers: 8,
+        accuracy_rate: 0.8,
+        total_score: 85,
+        max_score: 100,
+        grade_percentage: 85,
+        time_spent_minutes: 45,
+        difficulty_level: 3,
+        ai_provider: "qwen",
+        ocr_text: "1. 解方程：2x + 3 = 11...",
+        processing_time: 2.5,
+        feedback: "整体表现良好，需要注意计算细节",
+        weak_knowledge_points: ["一元一次方程", "代数运算"],
+        improvement_suggestions: ["多练习基本运算", "仔细检查计算步骤"],
+        error_types: ["计算错误", "粗心错误"],
+        is_completed: true,
+        created_at: "2024-01-15T14:30:00Z",
+        updated_at: "2024-01-15T14:35:00Z"
       },
       {
-        id: "2",
-        file_name: "物理实验报告.jpg",
-        subject: "physics" as const,
-        provider: "kimi" as const,
-        submitted_at: "2024-01-14T10:15:00Z",
-        processing_status: "completed" as const,
-        grade_score: 92,
-        file_url: "/uploads/physics_report.jpg",
-        analysis_id: "analysis_2"
+        id: 2,
+        student_id: 1,
+        subject: "physics",
+        submission_date: "2024-01-14T10:15:00Z",
+        total_questions: 8,
+        correct_answers: 7,
+        accuracy_rate: 0.875,
+        total_score: 92,
+        max_score: 100,
+        grade_percentage: 92,
+        time_spent_minutes: 60,
+        difficulty_level: 4,
+        ai_provider: "kimi",
+        ocr_text: "1. 一个质量为2kg的物体...",
+        processing_time: 3.2,
+        feedback: "物理概念理解较好，实验分析有待提高",
+        weak_knowledge_points: ["牛顿定律", "力的分析"],
+        improvement_suggestions: ["加强实验理解", "多做综合题"],
+        error_types: ["概念理解错误"],
+        is_completed: true,
+        created_at: "2024-01-14T10:15:00Z",
+        updated_at: "2024-01-14T10:20:00Z"
       },
       {
-        id: "3",
-        file_name: "英语作文_环保主题.jpg",
-        subject: "english" as const,
-        provider: "qwen" as const,
-        submitted_at: "2024-01-13T16:45:00Z",
-        processing_status: "completed" as const,
-        grade_score: 78,
-        file_url: "/uploads/english_essay.jpg",
-        analysis_id: "analysis_3"
+        id: 3,
+        student_id: 1,
+        subject: "english",
+        submission_date: "2024-01-13T16:45:00Z",
+        total_questions: 15,
+        correct_answers: 12,
+        accuracy_rate: 0.8,
+        total_score: 78,
+        max_score: 100,
+        grade_percentage: 78,
+        time_spent_minutes: 30,
+        difficulty_level: 2,
+        ai_provider: "qwen",
+        ocr_text: "The environment is very important...",
+        processing_time: 1.8,
+        feedback: "语法基础扎实，词汇量需要提升",
+        weak_knowledge_points: ["时态", "词汇运用"],
+        improvement_suggestions: ["多读英文文章", "扩大词汇量"],
+        error_types: ["语法错误", "词汇错误"],
+        is_completed: true,
+        created_at: "2024-01-13T16:45:00Z",
+        updated_at: "2024-01-13T16:50:00Z"
       },
       {
-        id: "4",
-        file_name: "数学练习册_第四章.jpg",
-        subject: "math" as const,
-        provider: "qwen" as const,
-        submitted_at: "2024-01-12T09:20:00Z",
-        processing_status: "pending" as const,
-        file_url: "/uploads/math_homework_4.jpg"
+        id: 4,
+        student_id: 1,
+        subject: "math",
+        submission_date: "2024-01-12T09:20:00Z",
+        total_questions: 12,
+        correct_answers: 9,
+        accuracy_rate: 0.75,
+        total_score: 75,
+        max_score: 100,
+        grade_percentage: 75,
+        time_spent_minutes: 50,
+        difficulty_level: 3,
+        ai_provider: "qwen",
+        ocr_text: "1. 计算下列各式的值...",
+        processing_time: 2.1,
+        feedback: "计算能力有所提升，继续保持",
+        weak_knowledge_points: ["分式运算", "因式分解"],
+        improvement_suggestions: ["练习分式化简", "掌握因式分解技巧"],
+        error_types: ["计算错误"],
+        is_completed: true,
+        created_at: "2024-01-12T09:20:00Z",
+        updated_at: "2024-01-12T09:25:00Z"
       },
       {
-        id: "5",
-        file_name: "物理作业_力学部分.jpg",
-        subject: "physics" as const,
-        provider: "kimi" as const,
-        submitted_at: "2024-01-11T11:30:00Z",
-        processing_status: "failed" as const,
-        file_url: "/uploads/physics_mechanics.jpg"
-      },
-      {
-        id: "6",
-        file_name: "英语阅读理解练习.jpg",
-        subject: "english" as const,
-        provider: "qwen" as const,
-        submitted_at: "2024-01-10T15:00:00Z",
-        processing_status: "completed" as const,
-        grade_score: 88,
-        file_url: "/uploads/english_reading.jpg",
-        analysis_id: "analysis_6"
-      },
-      {
-        id: "7",
-        file_name: "数学竞赛题目.jpg",
-        subject: "math" as const,
-        provider: "kimi" as const,
-        submitted_at: "2024-01-09T13:45:00Z",
-        processing_status: "completed" as const,
-        grade_score: 95,
-        file_url: "/uploads/math_competition.jpg",
-        analysis_id: "analysis_7"
-      },
-      {
-        id: "8",
-        file_name: "物理概念题集.jpg",
-        subject: "physics" as const,
-        provider: "qwen" as const,
-        submitted_at: "2024-01-08T08:30:00Z",
-        processing_status: "completed" as const,
-        grade_score: 82,
-        file_url: "/uploads/physics_concepts.jpg",
-        analysis_id: "analysis_8"
+        id: 5,
+        student_id: 1,
+        subject: "physics",
+        submission_date: "2024-01-11T15:10:00Z",
+        total_questions: 6,
+        correct_answers: 5,
+        accuracy_rate: 0.833,
+        total_score: 88,
+        max_score: 100,
+        grade_percentage: 88,
+        time_spent_minutes: 40,
+        difficulty_level: 4,
+        ai_provider: "kimi",
+        ocr_text: "1. 在水平面上，一个重100N的物体...",
+        processing_time: 2.8,
+        feedback: "力学分析能力较强，注意单位换算",
+        weak_knowledge_points: ["摩擦力", "受力分析"],
+        improvement_suggestions: ["加强受力分析训练", "注意单位统一"],
+        error_types: ["单位错误"],
+        is_completed: true,
+        created_at: "2024-01-11T15:10:00Z",
+        updated_at: "2024-01-11T15:15:00Z"
       }
     ]
   },
@@ -254,12 +250,23 @@ export const mockApiService = {
     await delay(2000) // Simulate file upload time
 
     return {
-      id: Date.now().toString(),
-      file_name: "数学作业_上传中.jpg",
-      subject: "math" as const,
-      provider: "qwen" as const,
-      submitted_at: new Date().toISOString(),
-      processing_status: "pending" as const
+      id: Date.now(),
+      student_id: 1,
+      subject: "math",
+      submission_date: new Date().toISOString(),
+      total_questions: 0,
+      correct_answers: 0,
+      accuracy_rate: 0,
+      total_score: 0,
+      max_score: 0,
+      grade_percentage: 0,
+      difficulty_level: 3,
+      weak_knowledge_points: [],
+      improvement_suggestions: [],
+      error_types: [],
+      is_completed: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     }
   },
 
@@ -270,15 +277,28 @@ export const mockApiService = {
     await delay(500)
 
     return {
-      id: homeworkId.toString(),
-      file_name: "数学作业_第5章.jpg",
-      subject: "math" as const,
-      provider: "qwen" as const,
-      submitted_at: "2024-03-15T10:30:00Z",
-      processing_status: "completed" as const,
-      grade_score: 85,
-      file_url: "/uploads/math_homework_5.jpg",
-      analysis_id: `analysis_${homeworkId}`
+      id: homeworkId,
+      student_id: 1,
+      subject: "math",
+      submission_date: "2024-03-15T10:30:00Z",
+      total_questions: 10,
+      correct_answers: 8,
+      accuracy_rate: 0.8,
+      total_score: 85,
+      max_score: 100,
+      grade_percentage: 85,
+      time_spent_minutes: 45,
+      difficulty_level: 3,
+      ai_provider: "qwen",
+      ocr_text: "1. 解方程：2x + 3 = 11...",
+      processing_time: 2.5,
+      feedback: "整体表现良好，需要注意计算细节",
+      weak_knowledge_points: ["一元一次方程", "代数运算"],
+      improvement_suggestions: ["多练习基本运算", "仔细检查计算步骤"],
+      error_types: ["计算错误", "粗心错误"],
+      is_completed: true,
+      created_at: "2024-03-15T10:30:00Z",
+      updated_at: "2024-03-15T10:35:00Z"
     }
   },
 
@@ -363,13 +383,17 @@ export const mockApiService = {
 
     // Create a mock PDF blob
     const mockPdfContent = `作业批改报告
-
 分析ID: ${analysisId}
-生成时间: ${new Date().toLocaleString('zh-CN')}
+生成时间: ${new Date().toLocaleString()}
 
-总体评价: 85分
-错题数量: 2题
-掌握程度: 良好
+总体表现：良好
+准确率：85%
+主要问题：计算细节需要加强
+
+改进建议：
+1. 多练习基础运算
+2. 建立验算习惯
+3. 注意审题细节
 
 详细分析请查看完整报告...`
 
@@ -846,7 +870,6 @@ export const mockApiService = {
       }, 700)
     })
   }
-
 }
 
 export default mockApiService

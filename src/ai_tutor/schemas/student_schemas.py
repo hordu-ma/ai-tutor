@@ -161,6 +161,62 @@ class StudentActivity(BaseModel):
     performance: Optional[float] = Field(None, ge=0.0, le=1.0)
 
 
+class HomeworkSubmission(BaseModel):
+    """作业提交记录"""
+
+    id: int
+    student_id: int
+    subject: str
+    submission_date: datetime
+    total_questions: int = Field(default=0, ge=0)
+    correct_answers: int = Field(default=0, ge=0)
+    accuracy_rate: float = Field(default=0.0, ge=0.0, le=1.0)
+    total_score: float = Field(default=0.0, ge=0.0)
+    max_score: float = Field(default=100.0, ge=0.0)
+    grade_percentage: float = Field(default=0.0, ge=0.0, le=100.0)
+    time_spent_minutes: Optional[int] = Field(None, ge=0)
+    difficulty_level: int = Field(default=3, ge=1, le=5)
+    ai_provider: Optional[str] = Field(None, max_length=50)
+    ocr_text: Optional[str] = None
+    processing_time: Optional[float] = Field(None, ge=0.0)
+    feedback: Optional[str] = None
+    weak_knowledge_points: List[str] = Field(default_factory=list)
+    improvement_suggestions: List[str] = Field(default_factory=list)
+    error_types: List[str] = Field(default_factory=list)
+    is_completed: bool = Field(default=True)
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class HomeworkHistoryResponse(BaseModel):
+    """作业历史响应"""
+
+    submissions: List[HomeworkSubmission] = Field(default_factory=list)
+    total_count: int = Field(default=0, ge=0)
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=20, ge=1)
+    total_pages: int = Field(default=0, ge=0)
+    has_next: bool = Field(default=False)
+    has_prev: bool = Field(default=False)
+
+    @staticmethod
+    def create(submissions: List[HomeworkSubmission], total_count: int, pagination: PaginationParams) -> "HomeworkHistoryResponse":
+        import math
+
+        total_pages = math.ceil(total_count / pagination.page_size) if total_count > 0 else 0
+        return HomeworkHistoryResponse(
+            submissions=submissions,
+            total_count=total_count,
+            page=pagination.page,
+            page_size=pagination.page_size,
+            total_pages=total_pages,
+            has_next=pagination.page < total_pages,
+            has_prev=pagination.page > 1,
+        )
+
+
 class StudentDetailResponse(StudentResponse):
     """学生详细信息响应"""
 

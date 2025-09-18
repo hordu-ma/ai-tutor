@@ -173,7 +173,10 @@
                                 </el-icon>
                             </div>
                             <div class="item-info">
-                                <div class="item-title">{{ submission.file_name }}</div>
+                                <div class="item-title">
+                                    作业 #{{ submission.id }} -
+                                    {{ getSubjectLabel(submission.subject) }}
+                                </div>
                                 <div class="item-meta">
                                     <el-tag
                                         :type="
@@ -185,7 +188,7 @@
                                     </el-tag>
                                     <span class="meta-separator">•</span>
                                     <span class="submit-date">
-                                        {{ formatDate(submission.submitted_at) }}
+                                        {{ formatDate(submission.submission_date) }}
                                     </span>
                                 </div>
                             </div>
@@ -194,52 +197,40 @@
                         <div class="item-center">
                             <div class="grade-info">
                                 <div
-                                    v-if="submission.grade_score !== undefined"
+                                    v-if="submission.grade_percentage !== undefined"
                                     class="grade-score"
                                 >
                                     <span class="score-label">得分:</span>
                                     <span
-                                        :class="getGradeClass(submission.grade_score)"
+                                        :class="
+                                            getGradeClass(submission.grade_percentage)
+                                        "
                                     >
-                                        {{ submission.grade_score }}%
+                                        {{ submission.grade_percentage }}%
                                     </span>
                                 </div>
                                 <div class="status-badge">
                                     <el-tag
                                         :type="
                                             getStatusTagType(
-                                                submission.processing_status,
+                                                submission.is_completed,
                                             ) as any
                                         "
                                         :effect="
-                                            submission.processing_status === 'pending'
-                                                ? 'plain'
-                                                : 'dark'
+                                            !submission.is_completed ? 'plain' : 'dark'
                                         "
                                         size="small"
                                     >
-                                        <el-icon
-                                            v-if="
-                                                submission.processing_status ===
-                                                'pending'
-                                            "
-                                        >
+                                        <el-icon v-if="!submission.is_completed">
                                             <Loading />
                                         </el-icon>
-                                        <el-icon
-                                            v-else-if="
-                                                submission.processing_status ===
-                                                'completed'
-                                            "
-                                        >
+                                        <el-icon v-else-if="submission.is_completed">
                                             <Select />
                                         </el-icon>
                                         <el-icon v-else>
                                             <Close />
                                         </el-icon>
-                                        {{
-                                            getStatusLabel(submission.processing_status)
-                                        }}
+                                        {{ getStatusLabel(submission.is_completed) }}
                                     </el-tag>
                                 </div>
                             </div>
@@ -251,9 +242,7 @@
                                     type="primary"
                                     link
                                     @click="viewDetails(submission)"
-                                    :disabled="
-                                        submission.processing_status !== 'completed'
-                                    "
+                                    :disabled="!submission.is_completed"
                                 >
                                     <el-icon><View /></el-icon>
                                     查看详情
@@ -266,20 +255,14 @@
                                         <el-dropdown-menu>
                                             <el-dropdown-item
                                                 :command="`regrade-${submission.id}`"
-                                                :disabled="
-                                                    submission.processing_status ===
-                                                    'pending'
-                                                "
+                                                :disabled="!submission.is_completed"
                                             >
                                                 <el-icon><Refresh /></el-icon>
                                                 重新批改
                                             </el-dropdown-item>
                                             <el-dropdown-item
                                                 :command="`download-${submission.id}`"
-                                                :disabled="
-                                                    submission.processing_status !==
-                                                    'completed'
-                                                "
+                                                :disabled="!submission.is_completed"
                                             >
                                                 <el-icon><Download /></el-icon>
                                                 下载报告
@@ -369,10 +352,11 @@ const filteredSubmissions = computed(() => {
     }
 
     // Filter by status
-    if (filters.value.status) {
-        result = result.filter(
-            (item: HomeworkSubmission) =>
-                item.processing_status === filters.value.status,
+    if (filters.value.status && filters.value.status !== "all") {
+        result = result.filter((item: HomeworkSubmission) =>
+            filters.value.status === "completed"
+                ? item.is_completed
+                : !item.is_completed,
         );
     }
 
@@ -380,7 +364,7 @@ const filteredSubmissions = computed(() => {
     if (filters.value.dateRange && filters.value.dateRange.length === 2) {
         const [startDate, endDate] = filters.value.dateRange;
         result = result.filter((item: HomeworkSubmission) => {
-            const itemDate = new Date(item.submitted_at);
+            const itemDate = new Date(item.submission_date);
             return itemDate >= startDate && itemDate <= endDate;
         });
     }
@@ -389,13 +373,16 @@ const filteredSubmissions = computed(() => {
     if (filters.value.search) {
         const searchLower = filters.value.search.toLowerCase();
         result = result.filter((item: HomeworkSubmission) =>
-            item.file_name.toLowerCase().includes(searchLower),
+            `作业 #${item.id} - ${getSubjectLabel(item.subject)}`
+                .toLowerCase()
+                .includes(searchLower),
         );
     }
 
     return result.sort(
         (a: HomeworkSubmission, b: HomeworkSubmission) =>
-            new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime(),
+            new Date(b.submission_date).getTime() -
+            new Date(a.submission_date).getTime(),
     );
 });
 
@@ -418,13 +405,12 @@ const totalSubmissions = computed(() => submissions.value.length);
 
 const averageGrade = computed(() => {
     const completedSubmissions = submissions.value.filter(
-        (s: HomeworkSubmission) =>
-            s.processing_status === "completed" && s.grade_score !== undefined,
+        (s: HomeworkSubmission) => s.is_completed && s.grade_percentage !== undefined,
     );
     if (completedSubmissions.length === 0) return 0;
 
     const sum = completedSubmissions.reduce(
-        (acc: number, s: HomeworkSubmission) => acc + (s.grade_score || 0),
+        (acc: number, s: HomeworkSubmission) => acc + (s.grade_percentage || 0),
         0,
     );
     return Math.round(sum / completedSubmissions.length);
@@ -436,10 +422,15 @@ const loadHistory = async () => {
     try {
         // Using demo student ID 1
         const data = await apiService.getHomeworkHistory(1, 100);
-        submissions.value = data;
+
+        // 添加数据验证，确保返回的是数组
+        submissions.value = Array.isArray(data) ? data : [];
     } catch (error) {
         console.error("Failed to load history:", error);
         ElMessage.error("无法加载作业历史记录");
+
+        // 设置空数组防止undefined错误
+        submissions.value = [];
     } finally {
         isLoading.value = false;
     }
@@ -484,26 +475,26 @@ const handleCurrentChange = (newPage: number) => {
 
 const viewDetails = (submission: HomeworkSubmission) => {
     // In a real app, this would navigate to a detailed view
-    ElMessage.info(`正在查看 ${submission.file_name} 的详情`);
+    ElMessage.info(`正在查看作业 #${submission.id} 的详情`);
 };
 
 const handleAction = async (command: string) => {
     const [action, idStr] = command.split("-");
-    const submission = submissions.value.find((s) => s.id === idStr);
+    const submission = submissions.value.find((s) => s.id.toString() === idStr);
 
     if (!submission) return;
 
     switch (action) {
         case "regrade":
-            ElMessage.info(`正在重新批改 ${submission.file_name}...`);
+            ElMessage.info(`正在重新批改作业 #${submission.id}...`);
             break;
         case "download":
-            ElMessage.info(`正在下载 ${submission.file_name} 的报告...`);
+            ElMessage.info(`正在下载作业 #${submission.id} 的报告...`);
             break;
         case "delete":
             try {
                 await ElMessageBox.confirm(
-                    `确定要删除 "${submission.file_name}" 吗？`,
+                    `确定要删除作业 #${submission.id} 吗？`,
                     "确认删除",
                     {
                         confirmButtonText: "删除",
@@ -554,22 +545,12 @@ const getSubjectTagType = (subject: string) => {
     return types[subject as keyof typeof types] || "info";
 };
 
-const getStatusLabel = (status: string) => {
-    const labels = {
-        completed: "已完成",
-        pending: "处理中",
-        failed: "失败",
-    };
-    return labels[status as keyof typeof labels] || status;
+const getStatusLabel = (isCompleted: boolean) => {
+    return isCompleted ? "已完成" : "处理中";
 };
 
-const getStatusTagType = (status: string) => {
-    const types = {
-        completed: "success" as const,
-        pending: "warning" as const,
-        failed: "danger" as const,
-    };
-    return types[status as keyof typeof types] || "info";
+const getStatusTagType = (isCompleted: boolean) => {
+    return isCompleted ? "success" : "warning";
 };
 
 const getGradeClass = (score: number) => {

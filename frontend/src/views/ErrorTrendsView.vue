@@ -443,13 +443,26 @@ const loadTrendData = async () => {
             filters.subject,
             filters.days,
         );
-        trendData.value = data;
 
-        // 初始化选中的错误类型
-        if (data.error_type_trends.length > 0) {
+        // 添加数据验证和默认值
+        trendData.value = data || {
+            student_id: filters.studentId,
+            subject: filters.subject,
+            analysis_period: `最近${filters.days}天`,
+            overall_trend: "stable",
+            error_rate_trend: [],
+            error_type_trends: [],
+            systematic_improvements: [],
+            persistent_issues: [],
+        };
+
+        // 安全访问数组属性
+        if (data?.error_type_trends?.length > 0) {
             selectedErrorTypes.value = data.error_type_trends
                 .slice(0, 3)
                 .map((t) => t.error_type);
+        } else {
+            selectedErrorTypes.value = [];
         }
 
         // 等待DOM更新后渲染图表
@@ -458,6 +471,19 @@ const loadTrendData = async () => {
     } catch (error) {
         console.error("加载趋势数据失败:", error);
         ElMessage.error("加载数据失败");
+
+        // 设置默认值防止undefined错误
+        trendData.value = {
+            student_id: filters.studentId,
+            subject: filters.subject,
+            analysis_period: `最近${filters.days}天`,
+            overall_trend: "stable",
+            error_rate_trend: [],
+            error_type_trends: [],
+            systematic_improvements: [],
+            persistent_issues: [],
+        };
+        selectedErrorTypes.value = [];
     } finally {
         loading.value = false;
     }

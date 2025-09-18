@@ -25,6 +25,8 @@ from ...schemas.student_schemas import (
     LearningTrend,
     StudentActivity,
     StudentDetailResponse,
+    HomeworkSubmission,
+    HomeworkHistoryResponse,
 )
 from .exceptions import (
     StudentNotFoundError,
@@ -403,6 +405,121 @@ class StudentService(LoggerMixin):
         except Exception as e:
             self.log_error("获取学生统计失败", student_id=student_id, exception=str(e))
             raise DatabaseOperationError("获取学生统计", e)
+
+    async def get_homework_history(
+        self,
+        student_id: int,
+        limit: int = 20,
+        offset: int = 0,
+        subject: Optional[str] = None
+    ) -> List[HomeworkSubmission]:
+        """获取学生作业历史记录
+
+        Args:
+            student_id: 学生ID
+            limit: 返回记录数量限制
+            offset: 偏移量
+            subject: 科目筛选（可选）
+
+        Returns:
+            List[HomeworkSubmission]: 作业提交记录列表
+        """
+        try:
+            # 验证学生存在
+            student = self.db.query(Student).filter(Student.id == student_id).first()
+            if not student:
+                raise StudentNotFoundError(student_id=student_id)
+
+            self.log_event("获取作业历史", student_id=student_id, limit=limit, offset=offset)
+
+            # 构建查询
+            query = self.db.query(HomeworkSession).filter(
+                HomeworkSession.student_id == student_id
+            )
+
+            # 添加科目筛选
+            if subject:
+                query = query.filter(HomeworkSession.subject == subject.upper())
+
+            # 排序和分页
+            homework_sessions = (
+                query.order_by(desc(HomeworkSession.created_at))
+                .offset(offset)
+                .limit(limit)
+                .all()
+            )
+
+            # 转换为HomeworkSubmission格式
+            submissions = []
+            for session in homework_sessions:
+                # 计算统计信息
+                questions = self.db.query(Question).filter(
+                    Question.homework_session_id == session.id
+                ).all()
+
+                total_questions = len(questions)
+                correct_answers = sum(1 for q in questions if q.is_correct)
+                accuracy_rate = correct_answers / total_questions if total_questions > 0 else 0.0
+                total_score = sum(q.score for q in questions if q.score is not None)
+                max_score = sum(q.max_score for q in questions if q.max_score is not None)
+                grade_percentage = (total_score / max_score * 100) if max_score > 0 else 0.0
+
+                # 提取错误类型和知识点
+                error_types = []
+                weak_knowledge_points = []
+                improvement_suggestions = []
+
+                for question in questions:
+                    if hasattr(question, 'error_type') and question.error_type:
+                        error_types.append(question.error_type)
+                    if hasattr(question, 'knowledge_points') and question.knowledge_points:
+                        weak_knowledge_points.extend(question.knowledge_points)
+                    if hasattr(question, 'feedback') and question.feedback:
+                        improvement_suggestions.append(question.feedback)
+
+                submission = HomeworkSubmission(
+                    id=session.id,
+                    student_id=session.student_id,
+                    subject=session.subject.lower() if session.subject else "unknown",
+                    submission_date=session.created_at,
+                    total_questions=total_questions,
+                    correct_answers=correct_answers,
+                    accuracy_rate=round(accuracy_rate, 3),
+                    total_score=round(total_score, 2),
+                    max_score=round(max_score, 2),
+                    grade_percentage=round(grade_percentage, 1),
+                    time_spent_minutes=getattr(session, 'time_spent_minutes', None),
+                    difficulty_level=getattr(session, 'difficulty_level', 3),
+                    ai_provider=getattr(session, 'ai_provider', None),
+                    ocr_text=getattr(session, 'ocr_text', None),
+                    processing_time=getattr(session, 'processing_time', None),
+                    feedback=getattr(session, 'feedback', None),
+                    weak_knowledge_points=list(set(weak_knowledge_points)),
+                    improvement_suggestions=list(set(improvement_suggestions)),
+                    error_types=list(set(error_types)),
+                    is_completed=getattr(session, 'is_completed', True),
+                    created_at=session.created_at,
+                    updated_at=session.updated_at or session.created_at
+                )
+                submissions.append(submission)
+
+            self.log_event(
+                "获取作业历史成功",
+                student_id=student_id,
+                submissions_count=len(submissions)
+            )
+            return submissions
+
+        except StudentNotFoundError:
+            raise
+        except Exception as e:
+            self.log_error(
+                "获取作业历史失败",
+                student_id=student_id,
+                exception=str(e)
+            )
+            # 返回空列表而不是抛出异常，保证前端能正常处理
+            return []
 
     # 私有辅助方法
 

@@ -1,15 +1,28 @@
 // 作业批改相关的类型定义
 
 export interface HomeworkSubmission {
-  id: string
-  file_name: string
-  subject: 'math' | 'physics' | 'english'
-  provider: 'qwen' | 'kimi'
-  submitted_at: string
-  processing_status: 'pending' | 'completed' | 'failed'
-  grade_score?: number
-  file_url?: string
-  analysis_id?: string
+  id: number
+  student_id: number
+  subject: string
+  submission_date: string
+  total_questions: number
+  correct_answers: number
+  accuracy_rate: number
+  total_score: number
+  max_score: number
+  grade_percentage: number
+  time_spent_minutes?: number
+  difficulty_level: number
+  ai_provider?: string
+  ocr_text?: string
+  processing_time?: number
+  feedback?: string
+  weak_knowledge_points: string[]
+  improvement_suggestions: string[]
+  error_types: string[]
+  is_completed: boolean
+  created_at: string
+  updated_at: string
 }
 
 export interface HomeworkAnalysis {

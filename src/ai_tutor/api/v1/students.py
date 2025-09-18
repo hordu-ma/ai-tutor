@@ -20,6 +20,8 @@ from ...schemas.student_schemas import (
     PaginationParams,
     SubjectProgress,
     LearningTrend,
+    HomeworkSubmission,
+    HomeworkHistoryResponse,
 )
 from ...services.student.student_service import StudentService
 from ...services.student.progress_service import get_progress_service, ProgressService
@@ -453,3 +455,40 @@ async def get_student_stats(
     except DatabaseOperationError as e:
         logger.error("获取学生统计失败", student_id=student_id, error=str(e))
         raise HTTPException(status_code=500, detail="服务器内部错误")
+
+
+@router.get("/students/{student_id}/homework")
+async def get_student_homework_history(
+    student_id: int = Path(..., description="学生ID"),
+    limit: int = Query(20, ge=1, le=100, description="返回记录数量"),
+    offset: int = Query(0, ge=0, description="偏移量"),
+    subject: Optional[str] = Query(None, description="科目筛选"),
+    student_service: StudentService = Depends(get_student_service)
+) -> List[HomeworkSubmission]:
+    """
+    获取学生作业历史记录
+
+    - **student_id**: 学生ID
+    - **limit**: 返回记录数量，默认20，最大100
+    - **offset**: 偏移量，用于分页
+    - **subject**: 科目筛选（可选）
+    """
+    try:
+        logger.info(f"获取学生 {student_id} 的作业历史，limit={limit}, offset={offset}")
+
+        homework_history = await student_service.get_homework_history(
+            student_id=student_id,
+            limit=limit,
+            offset=offset,
+            subject=subject
+        )
+
+        logger.info(f"成功获取学生 {student_id} 的作业历史，共 {len(homework_history)} 条记录")
+        return homework_history
+
+    except StudentNotFoundError as e:
+        logger.warning(f"学生 {student_id} 未找到")
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"获取作业历史失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
