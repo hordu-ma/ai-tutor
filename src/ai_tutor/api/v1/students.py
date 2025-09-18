@@ -57,9 +57,12 @@ async def get_subject_progress(
     - 薄弱知识点列表
     """
     try:
+        # 转换为大写格式以匹配数据库枚举
+        subject_upper = subject.upper()
+
         progress = await progress_service.calculate_subject_progress(
             student_id=student_id,
-            subject=subject,
+            subject=subject_upper,
             timeframe_days=timeframe_days
         )
         logger.info(f"获取学生{student_id}的{subject}学习进度成功")
@@ -90,9 +93,12 @@ async def get_learning_trends(
     - 平均分数趋势
     """
     try:
+        # 转换为大写格式以匹配数据库枚举
+        subject_upper = subject.upper()
+
         trends = await progress_service.get_learning_trends(
             student_id=student_id,
-            subject=subject,
+            subject=subject_upper,
             days=days
         )
         logger.info(f"获取学生{student_id}的{subject}学习趋势成功")
@@ -168,6 +174,35 @@ async def get_learning_patterns(
     except Exception as e:
         logger.error(f"分析学习模式失败: {str(e)}")
         raise HTTPException(status_code=500, detail=f"分析学习模式失败: {str(e)}")
+
+
+@router.get("/{student_id}/knowledge-points")
+async def get_knowledge_points(
+    student_id: int = Path(..., description="学生ID"),
+    subject: Optional[str] = Query(None, description="科目筛选"),
+    progress_service: ProgressService = Depends(get_progress_service),
+):
+    """
+    获取学生知识点掌握情况
+
+    - **student_id**: 学生ID
+    - **subject**: 科目筛选（可选）
+
+    返回学生的知识点掌握情况列表
+    """
+    try:
+        # 转换为大写格式以匹配数据库枚举（如果提供了科目）
+        subject_upper = subject.upper() if subject else None
+
+        # 暂时返回空数据，后续可以实现真实的知识点查询逻辑
+        knowledge_points = []
+
+        logger.info(f"获取学生{student_id}的知识点掌握情况成功")
+        return knowledge_points
+
+    except Exception as e:
+        logger.error(f"获取知识点掌握情况失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取知识点掌握情况失败: {str(e)}")
 
 
 @router.post("/{student_id}/knowledge-progress/{knowledge_point_id}")

@@ -7,7 +7,7 @@
 这是 AI Tutor 学情管理系统的前端部分，提供了一个直观、易用的学习分析仪表盘。学生可以通过该界面：
 
 - 📊 查看个人学习进度和知识点掌握情况
-- ⚡ 进行单题快速分析
+
 - 📈 了解错误模式和学习趋势
 - 📋 查看作业批改历史
 - 🎯 获得个性化学习改进建议
@@ -20,8 +20,6 @@
 - **错误模式分析**: 智能识别学习中的常见错误类型
 - **个性化改进计划**: 基于 AI 分析的学习建议
 - **学习统计**: 作业完成数量、平均分等关键指标
-
-### ⚡ 单题快速分析
 
 - **实时分析**: 输入题目和答案，获得即时 AI 分析
 - **错误分类**: 智能识别错误类型和严重程度
@@ -56,7 +54,7 @@ frontend/
 │   │   └── DefaultLayout.vue
 │   ├── views/             # 页面组件
 │   │   ├── DashboardView.vue      # 仪表盘
-│   │   ├── QuickAnalysisView.vue  # 单题分析
+
 │   │   └── HistoryView.vue        # 历史记录
 │   ├── services/          # API服务
 │   │   ├── api.ts         # 主API服务
@@ -197,7 +195,7 @@ VITE_USE_MOCK=true
 ### 主要接口
 
 - `GET /api/v1/students/{id}/progress/knowledge-points` - 获取知识点掌握情况
-- `POST /api/v1/error-analysis/analyze-question` - 单题错误分析
+
 - `GET /api/v1/error-analysis/students/{id}/patterns/{subject}` - 错误模式分析
 - `GET /api/v1/students/{id}/homework` - 作业历史记录
 
@@ -222,7 +220,7 @@ VITE_USE_MOCK=true
 ### ✅ 第一阶段完成 (当前版本)
 
 - [x] 基础框架搭建 (Vue 3 + TypeScript)
-- [x] 核心页面开发 (仪表盘、单题分析、历史记录)
+- [x] 核心页面开发 (仪表盘、作业上传、历史记录)
 - [x] Element Plus UI 集成
 - [x] 响应式布局设计
 - [x] API 服务层封装

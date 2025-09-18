@@ -19,7 +19,6 @@ from ..models.homework import Question, HomeworkSession, SubjectEnum
 from ..models.knowledge import KnowledgeProgress, KnowledgePoint, ErrorPattern
 from ..schemas.error_analysis import (
     ErrorPatternAnalysis,
-    QuestionErrorAnalysis,
     SystematicError,
     ErrorDetail,
     ImprovementRecommendation,
@@ -209,69 +208,7 @@ class ErrorPatternService:
             progress_indicators=progress_indicators
         )
 
-    async def analyze_question_error(
-        self,
-        question_text: str,
-        student_answer: str,
-        correct_answer: str,
-        subject: str,
-        knowledge_points: Optional[List[str]] = None
-    ) -> QuestionErrorAnalysis:
-        """分析单个题目的错误"""
-        logger.info(f"分析单题错误，科目: {subject}")
 
-        # 判断是否有错误
-        has_errors = student_answer.strip() != correct_answer.strip()
-
-        if not has_errors:
-            return QuestionErrorAnalysis(
-                has_errors=False,
-                errors=[],
-                overall_score=1.0,
-                confidence_score=1.0,
-                immediate_feedback="答案正确！",
-                improvement_suggestions=[]
-            )
-
-        # 创建临时Question对象用于分析
-        temp_question = Question(
-            question_text=question_text,
-            student_answer=student_answer,
-            correct_answer=correct_answer,
-            is_correct=False
-        )
-
-        # 分析错误类型
-        error_types = self.classifier.classify_error(temp_question, student_answer, subject)
-
-        # 创建错误详情
-        errors = []
-        for error_type in error_types:
-            error_detail = self._create_error_detail(error_type, temp_question, subject)
-            errors.append(error_detail)
-
-        # 评估整体得分
-        overall_score = self._calculate_question_score(temp_question, errors)
-        confidence_score = 0.8  # 简化的置信度计算
-
-        # 生成即时反馈和建议
-        immediate_feedback = self._generate_immediate_feedback(errors, subject)
-        improvement_suggestions = self._generate_question_improvements(errors, subject)
-
-        # 知识点掌握度分析
-        knowledge_point_mastery = self._analyze_knowledge_mastery(
-            knowledge_points or [], errors
-        )
-
-        return QuestionErrorAnalysis(
-            has_errors=True,
-            errors=errors,
-            overall_score=round(overall_score, 2),
-            confidence_score=round(confidence_score, 2),
-            knowledge_point_mastery=knowledge_point_mastery,
-            immediate_feedback=immediate_feedback,
-            improvement_suggestions=improvement_suggestions
-        )
 
     async def get_error_trends(
         self,

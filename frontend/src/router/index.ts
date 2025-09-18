@@ -19,12 +19,7 @@ const routes: Array<RouteRecordRaw> = [
         component: () => import('@/views/HomeworkUploadView.vue'),
         meta: { title: '作业上传' },
       },
-      {
-        path: 'quick-analysis',
-        name: 'QuickAnalysis',
-        component: () => import('@/views/QuickAnalysisView.vue'),
-        meta: { title: '单题分析' },
-      },
+
       {
         path: 'history',
         name: 'History',

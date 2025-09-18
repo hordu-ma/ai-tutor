@@ -376,11 +376,21 @@ const sendMessage = async () => {
         } else {
             throw new Error(response.message || "AI回复失败");
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error("发送消息失败:", error);
-        assistantMessage.content = "抱歉，AI服务暂时不可用，请稍后重试。";
+
+        // 显示详细的错误信息
+        const errorMessage = error.message || "AI服务调用失败";
+        assistantMessage.content = `❌ ${errorMessage}`;
         assistantMessage.status = "failed";
-        ElMessage.error("消息发送失败，请重试");
+
+        // 显示详细的错误提示
+        ElMessage({
+            message: errorMessage,
+            type: "error",
+            duration: 5000,
+            showClose: true,
+        });
     } finally {
         isLoading.value = false;
         await nextTick();

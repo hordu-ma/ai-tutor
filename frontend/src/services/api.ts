@@ -227,7 +227,7 @@ class ApiService {
     try {
       const params = subject ? { subject } : {}
       const response: AxiosResponse<KnowledgePoint[]> = await apiClient.get(
-        `/v1/students/${studentId}/progress/knowledge-points`,
+        `/v1/students/${studentId}/knowledge-points`,
         { params }
       )
       return response.data
@@ -385,10 +385,28 @@ class ApiService {
         request
       )
       return response.data
-    } catch (error) {
-      console.error('Error sending chat message:', error)
-      console.warn('Falling back to mock data')
-      return mockApiService.sendChatMessage(request)
+    } catch (error: any) {
+      // 构造详细的错误信息
+      let errorMessage = 'AI服务调用失败'
+      let errorDetails = ''
+
+      if (error.response) {
+        // 服务器返回错误响应
+        errorMessage = `服务器错误 (${error.response.status})`
+        errorDetails = error.response.data?.detail || error.response.statusText || '未知服务器错误'
+      } else if (error.request) {
+        // 请求发送失败（网络问题、服务器无响应等）
+        errorMessage = '网络连接失败'
+        errorDetails = '无法连接到AI服务，请检查网络连接或联系管理员'
+      } else {
+        // 其他错误
+        errorMessage = '请求配置错误'
+        errorDetails = error.message || '未知错误'
+      }
+
+      console.error('API调用失败:', errorMessage, errorDetails)
+      // 抛出详细错误而不是fallback到Mock数据
+      throw new Error(`${errorMessage}: ${errorDetails}`)
     }
   }
 

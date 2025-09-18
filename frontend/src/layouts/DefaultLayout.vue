@@ -20,10 +20,7 @@
                     <el-icon><UploadFilled /></el-icon>
                     <span>作业批改</span>
                 </el-menu-item>
-                <el-menu-item index="/quick-analysis">
-                    <el-icon><Lightning /></el-icon>
-                    <span>单题快速分析</span>
-                </el-menu-item>
+
                 <el-menu-item index="/ai-chat">
                     <el-icon><ChatDotRound /></el-icon>
                     <span>AI智能辅导</span>
@@ -65,7 +62,6 @@
 // However, explicit import can be clearer for team collaboration.
 import {
     DataAnalysis,
-    Lightning,
     Clock,
     UploadFilled,
     ChatDotRound,

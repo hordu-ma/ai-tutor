@@ -52,7 +52,7 @@
                                     :type="getDifficultyType(plan.difficulty_level)"
                                     class="difficulty-tag"
                                 >
-                                    {{ plan.difficulty_level }}
+                                    {{ plan.difficulty_level || "未知" }}
                                 </el-tag>
                             </div>
                         </div>
@@ -142,7 +142,8 @@ const planProgress = ref(0);
 const isStarted = ref(false);
 
 // Computed properties
-const getDifficultyType = computed(() => (difficulty: string) => {
+const getDifficultyType = computed(() => (difficulty: string | undefined) => {
+    if (!difficulty) return "info";
     switch (difficulty.toLowerCase()) {
         case "easy":
         case "beginner":

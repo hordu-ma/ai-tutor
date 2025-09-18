@@ -10,9 +10,7 @@ from ...db.database import get_db
 from ...services.error_analysis import get_error_analysis_service, ErrorPatternService
 from ...schemas.error_analysis import (
     ErrorAnalysisRequest,
-    QuestionErrorRequest,
     ErrorPatternAnalysis,
-    QuestionErrorAnalysis,
     ErrorTrendAnalysis
 )
 
@@ -43,18 +41,21 @@ async def get_error_patterns(
     try:
         logger.info(f"获取学生 {student_id} 的 {subject} 错误模式分析")
 
-        # 验证科目
+        # 验证科目并转换为大写
         valid_subjects = ["math", "physics", "english", "chinese", "chemistry", "biology"]
-        if subject not in valid_subjects:
+        if subject.lower() not in valid_subjects:
             raise HTTPException(
                 status_code=400,
                 detail=f"不支持的科目: {subject}。支持的科目: {', '.join(valid_subjects)}"
             )
 
+        # 转换为大写格式以匹配数据库枚举
+        subject_upper = subject.upper()
+
         # 执行分析
         analysis = await service.analyze_student_error_patterns(
             student_id=student_id,
-            subject=subject,
+            subject=subject_upper,
             timeframe_days=timeframe_days
         )
 
@@ -70,48 +71,6 @@ async def get_error_patterns(
         raise HTTPException(status_code=500, detail=f"分析失败: {str(e)}")
 
 
-@router.post("/analyze-question")
-async def analyze_question_error(
-    request: QuestionErrorRequest,
-    service: ErrorPatternService = Depends(get_error_analysis_service)
-) -> QuestionErrorAnalysis:
-    """
-    分析单个题目的错误
-
-    - **question_text**: 题目内容
-    - **student_answer**: 学生答案
-    - **correct_answer**: 正确答案
-    - **subject**: 科目
-    - **knowledge_points**: 相关知识点（可选）
-    """
-    try:
-        logger.info(f"分析单题错误，科目: {request.subject}")
-
-        # 验证输入
-        if not request.question_text.strip():
-            raise HTTPException(status_code=400, detail="题目内容不能为空")
-        if not request.student_answer.strip():
-            raise HTTPException(status_code=400, detail="学生答案不能为空")
-        if not request.correct_answer.strip():
-            raise HTTPException(status_code=400, detail="正确答案不能为空")
-
-        # 执行分析
-        analysis = await service.analyze_question_error(
-            question_text=request.question_text,
-            student_answer=request.student_answer,
-            correct_answer=request.correct_answer,
-            subject=request.subject,
-            knowledge_points=request.knowledge_points
-        )
-
-        logger.info(f"单题分析完成，发现 {len(analysis.errors)} 个错误")
-        return analysis
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"单题错误分析失败: {e}")
-        raise HTTPException(status_code=500, detail=f"分析失败: {str(e)}")
 
 
 @router.get("/students/{student_id}/trends/{subject}")
@@ -131,9 +90,12 @@ async def get_error_trends(
     try:
         logger.info(f"获取学生 {student_id} 的 {subject} 错误趋势分析，{days}天")
 
+        # 转换为大写格式以匹配数据库枚举
+        subject_upper = subject.upper()
+
         analysis = await service.get_error_trends(
             student_id=student_id,
-            subject=subject,
+            subject=subject_upper,
             days=days
         )
 
@@ -173,9 +135,12 @@ async def get_error_summary(
         # 分别分析每个科目
         for subject in subjects:
             try:
+                # 转换为大写格式以匹配数据库枚举
+                subject_upper = subject.upper()
+
                 analysis = await service.analyze_student_error_patterns(
                     student_id=student_id,
-                    subject=subject,
+                    subject=subject_upper,
                     timeframe_days=timeframe_days
                 )
 
@@ -291,10 +256,13 @@ async def get_improvement_plan(
     try:
         logger.info(f"生成学生 {student_id} 的 {subject} 改进计划")
 
+        # 转换为大写格式以匹配数据库枚举
+        subject_upper = subject.upper()
+
         # 获取错误模式分析
         analysis = await service.analyze_student_error_patterns(
             student_id=student_id,
-            subject=subject,
+            subject=subject_upper,
             timeframe_days=timeframe_days
         )
 

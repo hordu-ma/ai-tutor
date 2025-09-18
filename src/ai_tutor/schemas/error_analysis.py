@@ -60,13 +60,7 @@ class ErrorAnalysisRequest(BaseModel):
     include_recommendations: bool = Field(True, description="是否包含改进建议")
 
 
-class QuestionErrorRequest(BaseModel):
-    """单题错误分析请求"""
-    question_text: str = Field(..., description="题目内容")
-    student_answer: str = Field(..., description="学生答案")
-    correct_answer: str = Field(..., description="正确答案")
-    subject: str = Field(..., description="科目")
-    knowledge_points: Optional[List[str]] = Field(None, description="相关知识点")
+
 
 
 # ============= 响应模型 =============
@@ -163,30 +157,6 @@ class ErrorPatternAnalysis(BaseModel):
     analysis_version: str = Field("1.0", description="分析算法版本")
 
 
-class QuestionErrorAnalysis(BaseModel):
-    """单题错误分析"""
-    question_id: Optional[int] = Field(None, description="题目ID")
-
-    # 错误识别
-    has_errors: bool = Field(..., description="是否有错误")
-    errors: List[ErrorDetail] = Field(default_factory=list, description="错误详情列表")
-
-    # 整体评估
-    overall_score: float = Field(..., description="整体评分（0-1）")
-    confidence_score: float = Field(..., description="分析置信度（0-1）")
-
-    # 知识点分析
-    knowledge_point_mastery: Dict[str, float] = Field(
-        default_factory=dict,
-        description="知识点掌握度"
-    )
-
-    # 改进建议
-    immediate_feedback: str = Field(..., description="即时反馈")
-    improvement_suggestions: List[str] = Field(default_factory=list, description="改进建议")
-
-    # 相似错误
-    similar_error_patterns: List[str] = Field(default_factory=list, description="相似错误模式")
 
 
 class ErrorTrendAnalysis(BaseModel):
